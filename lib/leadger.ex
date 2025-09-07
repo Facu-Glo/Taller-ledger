@@ -21,8 +21,7 @@ defmodule Leadger do
 
     dic = (opts[:t] || "transaccion.csv")
     |> Leadger.Parser.decode_csv(?;)
-    |> Leadger.Transaccion.filtrar_c1(opts[:c1])
-    |> Leadger.Transaccion.filtrar_c2(opts[:c2])
+    |> Leadger.Transaccion.filtrar_cuentas(opts[:c1], opts[:c2])
 
     Leadger.Transaccion.manejar_salida(dic, opts[:o])
   end

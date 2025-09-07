@@ -4,14 +4,11 @@ defmodule Leadger.Transaccion do
     Enum.each(dic, fn row -> IO.inspect(row) end)
   end
 
-  def filtrar_c1(dic, nil), do: dic
-  def filtrar_c1(dic, cuenta) do
-    Stream.filter(dic, fn row -> row["cuenta_origen"] == cuenta end)
-  end
-
-  def filtrar_c2(dic, nil), do: dic
-  def filtrar_c2(dic, cuenta) do
-    Stream.filter(dic, fn row -> row["cuenta_destino"] == cuenta end)
+  def filtrar_cuentas(dic, c1, c2) do
+    Stream.filter(dic, fn row ->
+      (is_nil(c1) or row["cuenta_origen"] == c1) and
+      (is_nil(c2) or row["cuenta_destino"] == c2)
+    end)
   end
 
   def guardar_csv(data, filename) do
