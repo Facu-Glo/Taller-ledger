@@ -14,16 +14,22 @@ defmodule Leadger do
 #---------------------------------------------------------------------------------------
 
   def main(args) do
-    {opts, _, _invalid} =
+    {opts, positional, _invalid} =
       OptionParser.parse(args,
         switches: [c1: :string, c2: :string, t: :string, m: :string, o: :string]
       )
+    case positional do
+      ["transaccion"] ->
+        dic = (opts[:t] || "transaccion.csv")
+        |> Leadger.Parser.decode_transacciones(?;)
+        |> Leadger.Transaccion.filtrar_cuentas(opts[:c1], opts[:c2])
+        Leadger.Transaccion.manejar_salida(dic, opts[:o])
 
-    dic = (opts[:t] || "transaccion.csv")
-    |> Leadger.Parser.decode_transacciones(?;)
-    |> Leadger.Transaccion.filtrar_cuentas(opts[:c1], opts[:c2])
-
-    Leadger.Transaccion.manejar_salida(dic, opts[:o])
+      ["balance"] -> 
+        IO.puts("Proximamente: balance")
+      
+      _ -> IO.puts("Comando no reconocido. Use 'transaccion' o 'balance'")
+    end
   end
 
 end
