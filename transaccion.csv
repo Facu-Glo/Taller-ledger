@@ -14,4 +14,3 @@ id_transaccion;timestamp;moneda_origen;moneda_destino;monto;cuenta_origen;cuenta
 13;1757353204;ETH;;2.5;userE;;alta_cuenta
 14;1757356804;BTC;USDT;0.2;userA;;swap
 15;1757360404;USDT;USDT;1000;userB;userE;transferencia
-
