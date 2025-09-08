@@ -1,4 +1,14 @@
 defmodule Leadger.Transaccion do
+  defstruct [
+    :id_transaccion,
+    :timestamp,
+    :moneda_origen,
+    :moneda_destino,
+    :monto,
+    :cuenta_origen,
+    :cuenta_destino,
+    :tipo
+  ]
   
   def imprimir_dic_row(dic) do
     Enum.each(dic, fn row -> IO.inspect(row) end)
