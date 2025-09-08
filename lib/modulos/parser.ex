@@ -34,12 +34,13 @@ defmodule Leadger.Parser do
   
   def validar_monto(nil, line), do: {:error, line}
   def validar_monto("", line), do: {:error, line}
-  def validar_monto(monto_str, line) do
-    case Float.parse(monto_str) do
-      {monto, ""} when monto >= 0 -> {:ok, monto}
-      _ -> {:error, line}
+    def validar_monto(monto_str, line) do
+      result = Float.parse(monto_str)
+      case result do
+        {monto, ""} when monto >= 0 -> {:ok, monto}
+        _ -> {:error, line}
+      end
     end
-  end
   
   def validar_tipo(nil, line), do: {:error, line}
   def validar_tipo("", line), do: {:error, line}
