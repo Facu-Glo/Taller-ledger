@@ -11,26 +11,44 @@ defmodule Leadger.Transaccion do
   ]
   
   def imprimir_dic_row(dic) do
-    Enum.each(dic, fn row -> IO.inspect(row) end)
-  end
-
-  def filtrar_cuentas(dic, c1, c2) do
-    Stream.filter(dic, fn row ->
-      (is_nil(c1) or row["cuenta_origen"] == c1) and
-      (is_nil(c2) or row["cuenta_destino"] == c2)
+    Enum.each(dic, fn tupla ->
+      IO.inspect(tupla)
     end)
   end
 
-  def guardar_csv(data, filename) do
+  def filtrar_cuentas(dic, c1, c2) do
+    Stream.filter(dic, fn 
+      {:ok, struct} ->
+        origen = struct.cuenta_origen
+        destino = struct.cuenta_destino
+
+        ( is_nil(c1) or origen == c1 ) and
+        ( is_nil(c2) or destino == c2 )
+
+      {:error, _line} -> 
+            true
+    end)
+  end
+
+  def guardar_csv(dic, filename) do
     headers = ["id_transaccion", "timestamp", "moneda_origen", "moneda_destino", 
                "monto", "cuenta_origen", "cuenta_destino", "tipo"]
-    
-    ([headers | Enum.map(data, fn row ->
-      Enum.map(headers, fn header -> row[header] || "" end)
+
+    maps =
+      dic
+      |> Enum.filter(fn
+        {:ok, _struct} -> true
+        {:error, _line} -> false
+      end)
+      |> Enum.map(fn {:ok, struct} -> Map.from_struct(struct) end)
+
+    # Generar CSV
+    ([headers | Enum.map(maps, fn map ->
+      Enum.map(headers, fn header -> map[String.to_atom(header)] || "" end)
     end)])
     |> CSV.encode(separator: ?;)
     |> Enum.into(File.stream!(filename))
-    
+
     IO.puts("Resultados guardados en: #{filename}")
   end
   
