@@ -22,3 +22,5 @@ leadger-*.tar
 # Temporary files, for example, from tests.
 /tmp/
 
+# Ignorar binario
+/leadger
