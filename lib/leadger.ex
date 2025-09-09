@@ -31,6 +31,7 @@ defmodule Leadger do
 
       ["balance"] -> 
         IO.puts("Proximamente: balance")
+
       _ -> IO.puts("Comando no reconocido. Use 'transaccion' o 'balance'")
     end
   end
