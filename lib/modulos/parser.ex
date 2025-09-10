@@ -1,5 +1,9 @@
 defmodule Leadger.Parser do
-  def parser_args([]) do
+  # ---------------------- ---------- ----------------------
+  # ----------------------   Parser   ----------------------
+  # ---------------------- ---------- ----------------------
+
+  def parser_args([], _) do
     {:error, "Debe especificar un subcomando: transacciones o balance"}
   end
 
@@ -40,7 +44,9 @@ defmodule Leadger.Parser do
       :tipo
     ]
 
-    case read_and_validate_transactions(filename, list_headers) do
+    coins = load_monedas()
+
+    case read_and_validate_transactions(filename, list_headers, coins) do
       {:ok, map} ->
         IO.inspect(map)
         IO.puts("Transacciones procesadas exitosamente")
@@ -51,13 +57,13 @@ defmodule Leadger.Parser do
     end
   end
 
-  def read_and_validate_transactions(filename, list_headers) do
+  def read_and_validate_transactions(filename, list_headers, map_coins) do
     transaction =
       File.stream!(filename)
       |> CSV.decode!(headers: list_headers, separator: ?;)
       |> Stream.with_index(1)
       |> Enum.reduce_while([], fn {row, line_number}, acc ->
-        case validate_transaction_row(row, line_number) do
+        case validate_transaction_row(row, line_number, map_coins) do
           {:ok, map} ->
             {:cont, [map | acc]}
 
@@ -72,15 +78,28 @@ defmodule Leadger.Parser do
     end
   end
 
+  def load_monedas(path \\ "monedas.csv") do
+    headers = [:moneda, :valor]
+
+    File.stream!(path)
+    |> CSV.decode!(headers: headers, separator: ?;)
+    |> Enum.reduce(%{}, fn row, acc ->
+      case parse_float(row[:valor]) do
+        {:ok, value} -> Map.put(acc, row[:moneda], value)
+        _ -> acc
+      end
+    end)
+  end
+
   # ---------------------- ---------- ----------------------
   # ---------------------- Validation ----------------------
   # ---------------------- ---------- ----------------------
 
-  def validate_transaction_row(row, line_number) do
+  def validate_transaction_row(row, line_number, map_coins) do
     with {:ok, id} <- parse_integer(row[:id_transaccion]),
          {:ok, money} <- parse_float(row[:monto]),
          :ok <- validate_transaction_type(row[:tipo]),
-         :ok <- validate_coins([row[:moneda_origen], row[:moneda_destino]]) do
+         :ok <- validate_coins(row, map_coins) do
       {:ok,
        %{
          id: id,
@@ -120,8 +139,25 @@ defmodule Leadger.Parser do
 
   def validate_transaction_type(_), do: {:error, :invalid_type}
 
-  def validate_coins(coins) do
-
-    :ok
+  def validate_coins(%{tipo: "swap", moneda_origen: origen, moneda_destino: destino}, map_coins)
+      when origen != destino do
+    if Map.has_key?(map_coins, origen) and Map.has_key?(map_coins, destino) do
+      :ok
+    else
+      {:error, :invalid_coin}
+    end
   end
+
+  def validate_coins(
+        %{tipo: "transferencia", moneda_origen: moneda, moneda_destino: moneda},
+        map_coins
+      ) do
+    if Map.has_key?(map_coins, moneda), do: :ok, else: {:error, :invalid_coin}
+  end
+
+  def validate_coins(%{tipo: "alta_cuenta", moneda_origen: origen, moneda_destino: ""}, map_coins) do
+    if Map.has_key?(map_coins, origen), do: :ok, else: {:error, :invalid_coin}
+  end
+
+  def validate_coins(_, _), do: {:error, :invalid_type}
 end
