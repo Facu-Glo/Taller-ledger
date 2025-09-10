@@ -1,111 +1,127 @@
 defmodule Leadger.Parser do
+  def parser_args([]) do
+    {:error, "Debe especificar un subcomando: transacciones o balance"}
+  end
 
-  # Transacciones
-  # -----------------------------------------------------------#
-  alias Leadger.Transaccion
-  
-  def parse_transaccion(row, line, monedas) do
-    try do
-      with {:ok, monto} <- validar_monto(row["monto"], line),
-           {:ok, tipo_transferencia} <- validar_tipo(row["tipo"], line),
-           {:ok, moneda_origen} <- validar_moneda_origen(row["moneda_origen"],line, monedas),
-           {:ok, moneda_destino} <- validar_moneda_destino(row["moneda_destino"],line, monedas, tipo_transferencia) do
+  def parser_args(["transacciones" | flags]) do
+    config = parser_flags(flags)
+    {:transacciones, config}
+  end
 
-        {:ok, %Transaccion{
-          id_transaccion: row["id_transaccion"],
-          timestamp: row["timestamp"],
-          moneda_origen: moneda_origen,
-          moneda_destino: moneda_destino,
-          monto: monto,
-          cuenta_origen: row["cuenta_origen"],
-          cuenta_destino: row["cuenta_destino"],
-          tipo: tipo_transferencia
-        }}
+  def parser_args(["balance" | flags]) do
+    config = parser_flags(flags)
+    {:balance, config}
+  end
+
+  def parser_flags(flags) do
+    Enum.reduce(flags, %{}, fn flag, acc ->
+      case String.split(flag, "=", parts: 2) do
+        ["-c1", value] -> Map.put(acc, :cuenta_origen, value)
+        ["-c2", value] -> Map.put(acc, :cuenta_destino, value)
+        ["-t", value] -> Map.put(acc, :archivo_transacciones, value)
+        ["-m", value] -> Map.put(acc, :moneda, value)
+        ["-o", value] -> Map.put(acc, :archivo_salida, value)
+        _ -> acc
       end
-
-    rescue
-      _ -> {:error, line}
-    end
-  end
-  
-  def validar_tipo_moneda(tipo_moneda, line, monedas_disponible) do
-    if Map.has_key?(monedas_disponible, tipo_moneda) do
-      {:ok, tipo_moneda}
-    else
-      {:error, line}
-    end
-  end
-
-  def validar_moneda_origen(tipo_moneda, line, monedas), do: validar_tipo_moneda(tipo_moneda, line, monedas)
-
-  def validar_moneda_destino("", _line, _monedas, "alta_cuenta"), do: {:ok, ""}
-  def validar_moneda_destino(tipo_moneda, line, monedas, tipo_transferencia) when tipo_transferencia
-    in ["transferencia", "swap"] do
-    validar_tipo_moneda(tipo_moneda, line, monedas)
-  end
-
-  def validar_monto(nil, line), do: {:error, line}
-  def validar_monto("", line), do: {:error, line}
-    def validar_monto(monto_str, line) do
-      result = Float.parse(monto_str)
-      case result do
-        {monto, ""} when monto >= 0 -> {:ok, monto}
-        _ -> {:error, line}
-      end
-    end
-  
-  def validar_tipo(nil, line), do: {:error, line}
-  def validar_tipo("", line), do: {:error, line}
-  def validar_tipo(tipo, line) do
-    (tipo in ["transferencia", "swap", "alta_cuenta"] && {:ok, tipo}) || {:error, line}
-  end
-
-  def decode_transacciones(path, separator, monedas) do
-    File.stream!(path)
-    |> CSV.decode!(headers: true, separator: separator)
-    |> Stream.with_index(2)
-    |> Stream.map(fn {row, line} ->
-      parse_transaccion(row, line, monedas)
     end)
   end
-  
-  # -----------------------------------------------------------#
-  # monedas
 
-  def validar_monedas(row, line) do
-    nombre = row["nombre_moneda"]
-    precio_str = row["precio_usd"]
+  def handle_transactions(config) do
+    filename = Map.get(config, :archivo_transacciones, "transacciones.csv")
 
-    cond do 
-      is_nil(nombre) || nombre == "" ->
-        {:error, line}
-      is_nil(precio_str) || precio_str == "" ->
-        {:error, line}
-      true -> 
-        result = Float.parse(precio_str)
-        case result do
-          {precio, ""} when precio >= 0 -> 
-            {:ok, %{nombre_moneda: nombre, precio_usd: precio}}
-          _ -> {:error, line}
+    list_headers = [
+      :id_transaccion,
+      :timestamp,
+      :moneda_origen,
+      :moneda_destino,
+      :monto,
+      :cuenta_origen,
+      :cuenta_destino,
+      :tipo
+    ]
+
+    case read_and_validate_transactions(filename, list_headers) do
+      {:ok, map} ->
+        IO.inspect(map)
+        IO.puts("Transacciones procesadas exitosamente")
+
+      {:error, line_number} ->
+        IO.puts("Error en la línea #{line_number} del archivo de transacciones.")
+        IO.inspect({:error, line_number})
+    end
+  end
+
+  def read_and_validate_transactions(filename, list_headers) do
+    transaction =
+      File.stream!(filename)
+      |> CSV.decode!(headers: list_headers, separator: ?;)
+      |> Stream.with_index(1)
+      |> Enum.reduce_while([], fn {row, line_number}, acc ->
+        case validate_transaction_row(row, line_number) do
+          {:ok, map} ->
+            {:cont, [map | acc]}
+
+          {:error, _} ->
+            {:halt, {:error, line_number}}
         end
+      end)
+
+    case transaction do
+      {:error, line_number} -> {:error, line_number}
+      valid -> {:ok, Enum.reverse(valid)}
     end
   end
 
-def decode_monedas(path, separator) do
-  File.stream!(path)
-  |> CSV.decode!(headers: true, separator: separator)
-  |> Stream.with_index(2)
-  |> Stream.map(fn {row, line} -> 
-      validar_monedas(row, line) 
-    end)
-  |> Stream.filter(fn
-      {:ok, _ } -> true
-      {:error, _line} -> false
-    end)
-  |> Stream.map(fn {:ok, map} -> 
-      {map.nombre_moneda, map.precio_usd}
-    end)
-  |> Enum.into(%{})
-end
+  # ---------------------- ---------- ----------------------
+  # ---------------------- Validation ----------------------
+  # ---------------------- ---------- ----------------------
 
+  def validate_transaction_row(row, line_number) do
+    with {:ok, id} <- parse_integer(row[:id_transaccion]),
+         {:ok, money} <- parse_float(row[:monto]),
+         :ok <- validate_transaction_type(row[:tipo]),
+         :ok <- validate_coins([row[:moneda_origen], row[:moneda_destino]]) do
+      {:ok,
+       %{
+         id: id,
+         timestamp: row[:timestamp],
+         moneda_origen: row[:moneda_origen],
+         moneda_destino: row[:moneda_destino],
+         monto: money,
+         cuenta_origen: row[:cuenta_origen],
+         cuenta_destino: row[:cuenta_destino],
+         tipo: row[:tipo]
+       }}
+    else
+      _ -> {:error, line_number}
+    end
+  end
+
+  def parse_integer(nil), do: {:error, nil}
+  def parse_integer(""), do: {:error, nil}
+
+  def parse_integer(str) do
+    case Integer.parse(str) do
+      {int, ""} when int >= 0 -> {:ok, int}
+      _ -> {:error, nil}
+    end
+  end
+
+  def parse_float(string) do
+    case Float.parse(string) do
+      {number, ""} when number >= 0.0 -> {:ok, number}
+      _ -> {:error, nil}
+    end
+  end
+
+  def validate_transaction_type(transaction_type)
+      when transaction_type in ["swap", "transferencia", "alta_cuenta"],
+      do: :ok
+
+  def validate_transaction_type(_), do: {:error, :invalid_type}
+
+  def validate_coins(coins) do
+
+    :ok
+  end
 end
