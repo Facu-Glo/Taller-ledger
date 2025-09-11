@@ -1,7 +1,4 @@
 defmodule Leadger.Parser do
-  # ---------------------- ---------- ----------------------
-  # ----------------------   Parser   ----------------------
-  # ---------------------- ---------- ----------------------
 
   def parser_args([], _) do
     {:error, "Debe especificar un subcomando: transacciones o balance"}
@@ -30,7 +27,6 @@ defmodule Leadger.Parser do
     end)
   end
 
-  # ---------------------- ---------- ----------------------
 
   def handle_transactions(config) do
     filename = Map.get(config, :archivo_transacciones, "transacciones.csv")
@@ -93,9 +89,6 @@ defmodule Leadger.Parser do
     end)
   end
 
-  # ---------------------- ---------- ----------------------
-  # ---------------------- Validation ----------------------
-  # ---------------------- ---------- ----------------------
 
   def validate_transaction_row(row, line_number, map_coins) do
     with {:ok, id} <- parse_integer(row[:id_transaccion]),
@@ -163,9 +156,6 @@ defmodule Leadger.Parser do
 
   def validate_coins(_, _), do: {:error, :invalid_type}
 
-  # ---------------------- ---------- ----------------------
-  # ----------------------   Salida   ----------------------
-  # ---------------------- ---------- ----------------------
 
   def write_to_file_transaction(data, filename) do
     content =
@@ -228,9 +218,6 @@ defmodule Leadger.Parser do
     end
   end
 
-  # ---------------------- ------------- ----------------------
-  # ----------------------  Transaccion  ----------------------  
-  # ---------------------- ------------- ----------------------
 
   def filter_origin_account(list_transaction, nil), do: list_transaction
 
@@ -254,9 +241,6 @@ defmodule Leadger.Parser do
     |> filter_destination_account(Map.get(opts, :cuenta_destino))
   end
 
-  # ---------------------- ---------- ----------------------
-  # ----------------------   Balance  ----------------------
-  # ---------------------- ---------- ----------------------
 
   def handle_balance(config) do
     coins = load_monedas()
