@@ -5,7 +5,7 @@ defmodule Leadger.CurrencyLoader do
     File.stream!(path)
     |> CSV.decode!(headers: headers, separator: ?;)
     |> Enum.reduce(%{}, fn row, acc ->
-      case Leadger.Validators.parse_float(row[:valor]) do
+      case Leadger.Validators.parse_decimal(row[:valor]) do
         {:ok, value} -> Map.put(acc, row[:moneda], value)
         _ -> acc
       end

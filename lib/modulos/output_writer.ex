@@ -41,7 +41,7 @@ defmodule Leadger.OutputWriter do
 
     content =
       Enum.map(data, fn {currency, amount} ->
-        "#{currency};#{amount}\n"
+        "#{currency};#{Decimal.round(amount, 6)}\n"
       end)
 
     File.write!(filename, content)
@@ -49,7 +49,7 @@ defmodule Leadger.OutputWriter do
 
   def console_output_balance(data) do
     Enum.each(data, fn {currency, amount} ->
-      IO.puts("#{currency}=#{amount}")
+      IO.puts("#{currency}=#{Decimal.round(amount, 6)}")
     end)
   end
 

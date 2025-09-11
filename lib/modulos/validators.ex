@@ -9,9 +9,15 @@ defmodule Leadger.Validators do
     end
   end
 
-  def parse_float(string) do
-    case Float.parse(string) do
-      {number, ""} when number >= 0.0 -> {:ok, number}
+  def parse_decimal(string)do
+    case Decimal.parse(string) do
+      {decimal, ""}  -> 
+        zero = Decimal.new(0)
+        if Decimal.compare(decimal, zero) != :lt do
+          {:ok, decimal}
+        else
+          {:error, nil}
+        end
       _ -> {:error, nil}
     end
   end
@@ -46,7 +52,7 @@ defmodule Leadger.Validators do
 
   def validate_transaction_row(row, line_number, map_coins) do
     with {:ok, id} <- parse_integer(row[:id_transaccion]),
-         {:ok, money} <- parse_float(row[:monto]),
+         {:ok, money} <- parse_decimal(row[:monto]),
          :ok <- validate_transaction_type(row[:tipo]),
          :ok <- validate_coins(row, map_coins) do
       {:ok,

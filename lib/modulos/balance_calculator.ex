@@ -2,7 +2,11 @@ defmodule Leadger.BalanceCalculator do
   def calculate_balance(filename, origin_account, coins, opts) do
     case Leadger.TransactionReader.read_and_validate_transactions(filename, coins) do
       {:ok, list_transaction} ->
-        account = Leadger.TransactionReader.filter_transactions(list_transaction, %{cuenta_origen: origin_account})
+        account =
+          Leadger.TransactionReader.filter_transactions(list_transaction, %{
+            cuenta_origen: origin_account
+          })
+
         balances = compute_balance(account, origin_account, coins)
 
         case Map.get(opts, :moneda) do
@@ -25,7 +29,7 @@ defmodule Leadger.BalanceCalculator do
   end
 
   def update_balance(acc, currency, amount) do
-    Map.update(acc, currency, amount, fn current_value -> current_value + amount end)
+    Map.update(acc, currency, amount, fn current_value -> Decimal.add(current_value, amount) end)
   end
 
   def apply_transaction(
@@ -44,9 +48,14 @@ defmodule Leadger.BalanceCalculator do
 
   def apply_transaction(acc, %{tipo: "transferencia"} = map, origin_account, _coins) do
     cond do
-      map.cuenta_origen == origin_account -> update_balance(acc, map.moneda_origen, -map.monto)
-      map.cuenta_destino == origin_account -> update_balance(acc, map.moneda_origen, map.monto)
-      true -> acc
+      map.cuenta_origen == origin_account ->
+        update_balance(acc, map.moneda_origen, Decimal.negate(map.monto))
+
+      map.cuenta_destino == origin_account ->
+        update_balance(acc, map.moneda_origen, map.monto)
+
+      true ->
+        acc
     end
   end
 
@@ -68,7 +77,7 @@ defmodule Leadger.BalanceCalculator do
       )
 
     acc
-    |> update_balance(moneda_origen, -monto)
+    |> update_balance(moneda_origen, Decimal.negate(monto))
     |> update_balance(moneda_destino, converted_amount)
   end
 
@@ -76,23 +85,33 @@ defmodule Leadger.BalanceCalculator do
     origin_coin = Map.get(coins, map.moneda_origen)
     destiny_coin = Map.get(coins, map.moneda_destino)
 
-    if destiny_coin > 0 do
-      map.monto * origin_coin / destiny_coin
+    zero = Decimal.new(0)
+
+    if Decimal.compare(destiny_coin, zero) == :gt do
+      map.monto
+      |> Decimal.mult(origin_coin)
+      |> Decimal.div(destiny_coin)
     else
-      0.0
+      zero
     end
   end
 
   def convert_to_currency(balances, target_currency, coins) do
     if Map.has_key?(coins, target_currency) do
       target_value = Map.get(coins, target_currency)
+      zero = Decimal.new(0)
 
       total =
-        Enum.reduce(balances, 0.0, fn {currency, amount}, acc ->
+        Enum.reduce(balances, zero, fn {currency, amount}, acc ->
           currency_value = Map.get(coins, currency)
 
-          if target_value > 0 do
-            acc + amount * currency_value / target_value
+          if Decimal.compare(target_value, zero) == :gt do
+            converted =
+              amount
+              |> Decimal.mult(currency_value)
+              |> Decimal.div(target_value)
+
+            Decimal.add(acc, converted)
           else
             acc
           end
