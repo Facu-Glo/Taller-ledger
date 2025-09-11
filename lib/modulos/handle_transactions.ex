@@ -1,5 +1,4 @@
 defmodule Leadger.HandleTransactions do
-  
   def handle_transactions(config) do
     filename = Map.get(config, :archivo_transacciones, "transacciones.csv")
 

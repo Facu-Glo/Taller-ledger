@@ -9,16 +9,19 @@ defmodule Leadger.Validators do
     end
   end
 
-  def parse_decimal(string)do
+  def parse_decimal(string) do
     case Decimal.parse(string) do
-      {decimal, ""}  -> 
+      {decimal, ""} ->
         zero = Decimal.new(0)
+
         if Decimal.compare(decimal, zero) != :lt do
           {:ok, decimal}
         else
           {:error, nil}
         end
-      _ -> {:error, nil}
+
+      _ ->
+        {:error, nil}
     end
   end
 
