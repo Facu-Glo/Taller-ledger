@@ -30,9 +30,25 @@ defmodule Leadger.Parser do
     end)
   end
 
+  # ---------------------- ---------- ----------------------
+
   def handle_transactions(config) do
     filename = Map.get(config, :archivo_transacciones, "transacciones.csv")
 
+    coins = load_monedas()
+
+    case read_and_validate_transactions(filename, coins) do
+      {:ok, map} ->
+        filter = filter_transactions(map, config)
+        output_results_transaction(filter, config)
+
+      {:error, line_number} ->
+        IO.puts("Error en la línea #{line_number} del archivo de transacciones.")
+        IO.inspect({:error, line_number})
+    end
+  end
+
+  def read_and_validate_transactions(filename, map_coins) do
     list_headers = [
       :id_transaccion,
       :timestamp,
@@ -44,20 +60,6 @@ defmodule Leadger.Parser do
       :tipo
     ]
 
-    coins = load_monedas()
-
-    case read_and_validate_transactions(filename, list_headers, coins) do
-      {:ok, map} ->
-        IO.inspect(map)
-        IO.puts("Transacciones procesadas exitosamente")
-
-      {:error, line_number} ->
-        IO.puts("Error en la línea #{line_number} del archivo de transacciones.")
-        IO.inspect({:error, line_number})
-    end
-  end
-
-  def read_and_validate_transactions(filename, list_headers, map_coins) do
     transaction =
       File.stream!(filename)
       |> CSV.decode!(headers: list_headers, separator: ?;)
@@ -160,4 +162,224 @@ defmodule Leadger.Parser do
   end
 
   def validate_coins(_, _), do: {:error, :invalid_type}
+
+  # ---------------------- ---------- ----------------------
+  # ----------------------   Salida   ----------------------
+  # ---------------------- ---------- ----------------------
+
+  def write_to_file_transaction(data, filename) do
+    content =
+      Enum.map(data, fn transaction ->
+        [
+          transaction.id,
+          transaction.timestamp,
+          transaction.moneda_origen,
+          transaction.moneda_destino,
+          transaction.monto,
+          transaction.cuenta_origen,
+          transaction.cuenta_destino,
+          transaction.tipo
+        ]
+      end)
+
+    File.open!(filename, [:write], fn file ->
+      content
+      |> CSV.encode(separator: ?;)
+      |> Enum.each(fn line -> IO.write(file, line) end)
+    end)
+  end
+
+  def console_output_transaction(data) do
+    Enum.map(data, fn transaction ->
+      IO.puts(
+        "#{transaction.id};#{transaction.timestamp};#{transaction.moneda_origen};#{transaction.moneda_destino};#{transaction.monto};#{transaction.cuenta_origen};#{transaction.cuenta_destino};#{transaction.tipo}"
+      )
+    end)
+  end
+
+  def output_results_transaction(lis_transaction, opts) do
+    case Map.get(opts, :archivo_salida) do
+      nil -> console_output_transaction(lis_transaction)
+      filename -> write_to_file_transaction(lis_transaction, filename)
+    end
+  end
+
+  def write_to_file_balance(data, filename) do
+    IO.inspect(data)
+
+    content =
+      Enum.map(data, fn {currency, amount} ->
+        "#{currency};#{amount}\n"
+      end)
+
+    File.write!(filename, content)
+  end
+
+  def console_output_balance(data) do
+    Enum.each(data, fn {currency, amount} ->
+      IO.puts("#{currency}=#{amount}")
+    end)
+  end
+
+  def output_results_balance(balance, opts) do
+    case Map.get(opts, :archivo_salida) do
+      nil -> console_output_balance(balance)
+      filename -> write_to_file_balance(balance, filename)
+    end
+  end
+
+  # ---------------------- ------------- ----------------------
+  # ----------------------  Transaccion  ----------------------  
+  # ---------------------- ------------- ----------------------
+
+  def filter_origin_account(list_transaction, nil), do: list_transaction
+
+  def filter_origin_account(list_transaction, cuenta_origen) do
+    Enum.filter(list_transaction, fn transaction ->
+      transaction.cuenta_origen == cuenta_origen
+    end)
+  end
+
+  def filter_destination_account(list_transaction, nil), do: list_transaction
+
+  def filter_destination_account(list_transaction, cuenta_destino) do
+    Enum.filter(list_transaction, fn transaction ->
+      transaction.cuenta_destino == cuenta_destino
+    end)
+  end
+
+  def filter_transactions(list_transaction, opts) do
+    list_transaction
+    |> filter_origin_account(Map.get(opts, :cuenta_origen))
+    |> filter_destination_account(Map.get(opts, :cuenta_destino))
+  end
+
+  # ---------------------- ---------- ----------------------
+  # ----------------------   Balance  ----------------------
+  # ---------------------- ---------- ----------------------
+
+  def handle_balance(config) do
+    coins = load_monedas()
+
+    case Map.get(config, :cuenta_origen) do
+      nil ->
+        IO.puts("Debe especificar una cuenta de origen con -c1")
+
+      origin_account ->
+        filename = Map.get(config, :archivo_transacciones, "transacciones.csv")
+
+        case calculate_balance(filename, origin_account, coins, config) do
+          {:ok, balance} ->
+            output_results_balance(balance, config)
+
+          {:error, line_number} ->
+            IO.puts("Error en la línea #{line_number} del archivo de transacciones.")
+        end
+    end
+  end
+
+  def calculate_balance(filename, origin_account, coins, opts) do
+    case read_and_validate_transactions(filename, coins) do
+      {:ok, list_transaction} ->
+        account = filter_transactions(list_transaction, %{cuenta_origen: origin_account})
+        balances = compute_balance(account, origin_account, coins)
+
+        case Map.get(opts, :moneda) do
+          nil ->
+            {:ok, balances}
+
+          target_currency ->
+            convert_to_currency(balances, target_currency, coins)
+        end
+
+      {:error, line_number} ->
+        {:error, line_number}
+    end
+  end
+
+  def compute_balance(accounts, origin_account, coins) do
+    Enum.reduce(accounts, %{}, fn transaction, acc ->
+      apply_transaction(acc, transaction, origin_account, coins)
+    end)
+  end
+
+  def update_balance(acc, currency, amount) do
+    Map.update(acc, currency, amount, fn current_value -> current_value + amount end)
+  end
+
+  def apply_transaction(
+        acc,
+        %{
+          tipo: "alta_cuenta",
+          moneda_origen: moneda,
+          monto: monto
+        },
+        _origin_account,
+        _coins
+      ) do
+    currency = if moneda != "", do: moneda, else: "USD"
+    update_balance(acc, currency, monto)
+  end
+
+  def apply_transaction(acc, %{tipo: "transferencia"} = map, origin_account, _coins) do
+    cond do
+      map.cuenta_origen == origin_account -> update_balance(acc, map.moneda_origen, -map.monto)
+      map.cuenta_destino == origin_account -> update_balance(acc, map.moneda_origen, map.monto)
+      true -> acc
+    end
+  end
+
+  def apply_transaction(
+        acc,
+        %{
+          tipo: "swap",
+          moneda_origen: moneda_origen,
+          moneda_destino: moneda_destino,
+          monto: monto
+        },
+        _origin_account,
+        coins
+      ) do
+    converted_amount =
+      get_converted_amount(
+        %{moneda_origen: moneda_origen, moneda_destino: moneda_destino, monto: monto},
+        coins
+      )
+
+    acc
+    |> update_balance(moneda_origen, -monto)
+    |> update_balance(moneda_destino, converted_amount)
+  end
+
+  def get_converted_amount(map, coins) do
+    origin_coin = Map.get(coins, map.moneda_origen)
+    destiny_coin = Map.get(coins, map.moneda_destino)
+
+    if destiny_coin > 0 do
+      map.monto * origin_coin / destiny_coin
+    else
+      0.0
+    end
+  end
+
+  def convert_to_currency(balances, target_currency, coins) do
+    if Map.has_key?(coins, target_currency) do
+      target_value = Map.get(coins, target_currency)
+
+      total =
+        Enum.reduce(balances, 0.0, fn {currency, amount}, acc ->
+          currency_value = Map.get(coins, currency)
+
+          if target_value > 0 do
+            acc + amount * currency_value / target_value
+          else
+            acc
+          end
+        end)
+
+      {:ok, %{target_currency => total}}
+    else
+      {:error, :invalid_target_currency}
+    end
+  end
 end

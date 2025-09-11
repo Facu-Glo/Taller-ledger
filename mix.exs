@@ -22,7 +22,8 @@ defmodule Leadger.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:csv, "~> 3.2"}
+      {:csv, "~> 3.2"},
+      {:decimal, "~> 2.0"}
     ]
   end
 end
