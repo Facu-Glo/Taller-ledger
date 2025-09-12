@@ -1,8 +1,8 @@
-defmodule LeadgerTest do
+defmodule LedgerTest do
   use ExUnit.Case
-  doctest Leadger
+  doctest Ledger
 
   test "greets the world" do
-    assert Leadger.hello() == :world
+    assert Ledger.hello() == :world
   end
 end

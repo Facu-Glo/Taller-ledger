@@ -1,4 +1,4 @@
-defmodule Leadger.Validators do
+defmodule Ledger.Validators do
   def parse_integer(nil), do: {:error, nil}
   def parse_integer(""), do: {:error, nil}
 

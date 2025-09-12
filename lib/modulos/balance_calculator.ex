@@ -1,9 +1,9 @@
-defmodule Leadger.BalanceCalculator do
+defmodule Ledger.BalanceCalculator do
   def calculate_balance(filename, origin_account, coins, opts) do
-    case Leadger.TransactionReader.read_and_validate_transactions(filename, coins) do
+    case Ledger.TransactionReader.read_and_validate_transactions(filename, coins) do
       {:ok, list_transaction} ->
         account =
-          Leadger.TransactionReader.filter_transactions(list_transaction, %{
+          Ledger.TransactionReader.filter_transactions(list_transaction, %{
             cuenta_origen: origin_account
           })
 

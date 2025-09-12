@@ -1,4 +1,4 @@
-defmodule Leadger.MixProject do
+defmodule Ledger.MixProject do
   use Mix.Project
 
   def project do
@@ -6,7 +6,7 @@ defmodule Leadger.MixProject do
       app: :leadger,
       version: "0.1.0",
       elixir: "~> 1.18",
-      escript: [main_module: Leadger],
+      escript: [main_module: Ledger],
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]

@@ -1,4 +1,4 @@
-defmodule Leadger.Parser do
+defmodule Ledger.Parser do
   def parser_args([]) do
     {:error, "Debe especificar un subcomando: transacciones o balance"}
   end

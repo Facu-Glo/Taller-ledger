@@ -1,4 +1,4 @@
-defmodule Leadger.TransactionReader do
+defmodule Ledger.TransactionReader do
   def read_and_validate_transactions(filename, map_coins) do
     list_headers = [
       :id_transaccion,
@@ -16,7 +16,7 @@ defmodule Leadger.TransactionReader do
       |> CSV.decode!(headers: list_headers, separator: ?;)
       |> Stream.with_index(1)
       |> Enum.reduce_while([], fn {row, line_number}, acc ->
-        case Leadger.Validators.validate_transaction_row(row, line_number, map_coins) do
+        case Ledger.Validators.validate_transaction_row(row, line_number, map_coins) do
           {:ok, map} ->
             {:cont, [map | acc]}
 

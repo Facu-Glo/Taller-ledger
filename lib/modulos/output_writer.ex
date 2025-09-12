@@ -1,4 +1,4 @@
-defmodule Leadger.OutputWriter do
+defmodule Ledger.OutputWriter do
   def write_to_file_transaction(data, filename) do
     content =
       Enum.map(data, fn transaction ->
