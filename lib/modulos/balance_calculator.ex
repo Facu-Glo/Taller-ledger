@@ -3,9 +3,7 @@ defmodule Ledger.BalanceCalculator do
     case Ledger.TransactionReader.read_and_validate_transactions(filename, coins) do
       {:ok, list_transaction} ->
         account =
-          Ledger.TransactionReader.filter_transactions(list_transaction, %{
-            cuenta_origen: origin_account
-          })
+          filter_for_balance(list_transaction, origin_account)
 
         balances = compute_balance(account, origin_account, coins)
 
@@ -20,6 +18,12 @@ defmodule Ledger.BalanceCalculator do
       {:error, messege} ->
         {:error, messege}
     end
+  end
+
+  def filter_for_balance(list_transaction, account) do
+    Enum.filter(list_transaction, fn t ->
+      t.cuenta_origen == account or t.cuenta_destino == account
+    end)
   end
 
   def compute_balance(accounts, origin_account, coins) do
