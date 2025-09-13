@@ -13,8 +13,11 @@ defmodule Ledger.HandleBalance do
           {:ok, balance} ->
             Ledger.OutputWriter.output_results_balance(balance, config)
 
-          {:error, line_number} ->
+          {:error, line_number} when is_integer (line_number)->
             IO.puts("Error en la línea #{line_number} del archivo de transacciones.")
+
+          {:error, messege} when is_binary(messege) ->
+            IO.puts("Error: #{messege}")
         end
     end
   end

@@ -73,4 +73,38 @@ defmodule Ledger.Validators do
       _ -> {:error, line_number}
     end
   end
+
+  def validate_transactions_accounts(transactions) do
+    sorted_transactions = Enum.sort_by(transactions, fn transaction -> transaction.timestamp end)
+    set = MapSet.new()
+    validate_account_creation(sorted_transactions, set)
+  end
+
+  def validate_account_creation([], _account_set), do: :ok
+
+  def validate_account_creation([transaction | rest], account_set) do
+    case transaction.tipo do
+      "alta_cuenta" ->
+        new_account_set = MapSet.put(account_set, transaction.cuenta_origen)
+        validate_account_creation(rest, new_account_set)
+
+      "transferencia" ->
+        if MapSet.member?(account_set, transaction.cuenta_origen) and
+             MapSet.member?(account_set, transaction.cuenta_destino) do
+          validate_account_creation(rest, account_set)
+        else
+          {:error, "account not created before transfer"}
+        end
+
+      "swap" ->
+        if MapSet.member?(account_set, transaction.cuenta_origen) do
+          validate_account_creation(rest, account_set)
+        else
+          {:error, "account not created before swap"}
+        end
+
+      _ ->
+        validate_account_creation(rest, account_set)
+    end
+  end
 end

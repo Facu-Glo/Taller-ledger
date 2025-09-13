@@ -30,7 +30,12 @@ defmodule Ledger.TransactionReader do
 
       case transaction do
         {:error, line_number} -> {:error, line_number}
-        valid -> {:ok, Enum.reverse(valid)}
+        valid -> reversed_transactions = Enum.reverse(valid)
+
+          case Ledger.Validators.validate_transactions_accounts(reversed_transactions) do
+            :ok -> {:ok, reversed_transactions}
+            {:error, messege} -> {:error, messege}
+          end
       end
     end
   end
