@@ -1,33 +1,37 @@
 defmodule Ledger.TransactionReader do
   def read_and_validate_transactions(filename, map_coins) do
-    list_headers = [
-      :id_transaccion,
-      :timestamp,
-      :moneda_origen,
-      :moneda_destino,
-      :monto,
-      :cuenta_origen,
-      :cuenta_destino,
-      :tipo
-    ]
+    if not File.exists?(filename) do
+      {:error, "File not found"}
+    else
+      list_headers = [
+        :id_transaccion,
+        :timestamp,
+        :moneda_origen,
+        :moneda_destino,
+        :monto,
+        :cuenta_origen,
+        :cuenta_destino,
+        :tipo
+      ]
 
-    transaction =
-      File.stream!(filename)
-      |> CSV.decode!(headers: list_headers, separator: ?;)
-      |> Stream.with_index(1)
-      |> Enum.reduce_while([], fn {row, line_number}, acc ->
-        case Ledger.Validators.validate_transaction_row(row, line_number, map_coins) do
-          {:ok, map} ->
-            {:cont, [map | acc]}
+      transaction =
+        File.stream!(filename)
+        |> CSV.decode!(headers: list_headers, separator: ?;)
+        |> Stream.with_index(1)
+        |> Enum.reduce_while([], fn {row, line_number}, acc ->
+          case Ledger.Validators.validate_transaction_row(row, line_number, map_coins) do
+            {:ok, map} ->
+              {:cont, [map | acc]}
 
-          {:error, _} ->
-            {:halt, {:error, line_number}}
-        end
-      end)
+            {:error, _} ->
+              {:halt, {:error, line_number}}
+          end
+        end)
 
-    case transaction do
-      {:error, line_number} -> {:error, line_number}
-      valid -> {:ok, Enum.reverse(valid)}
+      case transaction do
+        {:error, line_number} -> {:error, line_number}
+        valid -> {:ok, Enum.reverse(valid)}
+      end
     end
   end
 

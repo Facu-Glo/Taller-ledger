@@ -9,9 +9,12 @@ defmodule Ledger.HandleTransactions do
         filter = Ledger.TransactionReader.filter_transactions(map, config)
         Ledger.OutputWriter.output_results_transaction(filter, config)
 
-      {:error, line_number} ->
+      {:error, line_number} when is_integer(line_number) ->
         IO.puts("Error en la línea #{line_number} del archivo de transacciones.")
         IO.inspect({:error, line_number})
+
+      {:error, messege} when is_binary(messege)->
+        IO.puts("Error: #{messege}")
     end
   end
 end
