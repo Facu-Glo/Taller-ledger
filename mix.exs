@@ -3,7 +3,7 @@ defmodule Ledger.MixProject do
 
   def project do
     [
-      app: :leadger,
+      app: :ledger,
       version: "0.1.0",
       elixir: "~> 1.18",
       escript: [main_module: Ledger],
