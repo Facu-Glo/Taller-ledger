@@ -18,7 +18,7 @@ defmodule LedgerTest do
     1;1754937004;USDT;USDT;100.50;userA;userB;transferencia
     2;1755541804;BTC;USDT;0.1;userB;;swap
     3;1756751404;BTC;;50000;userC;;alta_cuenta
-    4;1756851404;ETH;ARS;2.5;userA;userD;transferencia
+    4;1756851404;ETH;ETH;2.5;userA;userD;transferencia
     5;1756951404;USDT;;1000;userA;;alta_cuenta
     """
 
@@ -51,7 +51,13 @@ defmodule LedgerTest do
 
     test "handles balance subcommand without -c1 flag" do
       output = capture_io(fn -> Ledger.main(["balance"]) end)
-      assert output =~ "Error: Archivo de monedas no especificado. Use -m=archivo_monedas.csv"
+      assert output =~ "Debe especificar una cuenta de origen con -c1"
+    end
+
+    test "handles transactions subcommand", context do
+      File.cd!(context.tmp_dir)
+      output = capture_io(fn -> Ledger.main(["transacciones"]) end)
+      assert output =~ "1;1754937004;USDT;USDT;100.50;userA;userB;transferencia"
     end
   end
 end
