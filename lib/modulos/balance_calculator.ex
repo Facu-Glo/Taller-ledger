@@ -17,8 +17,8 @@ defmodule Ledger.BalanceCalculator do
             convert_to_currency(balances, target_currency, coins)
         end
 
-      {:error, line_number} ->
-        {:error, line_number}
+      {:error, messege} ->
+        {:error, messege}
     end
   end
 
