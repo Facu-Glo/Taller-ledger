@@ -17,7 +17,10 @@ defmodule Ledger.OutputWriter do
     File.open!(filename, [:write], fn file ->
       content
       |> CSV.encode(separator: ?;)
-      |> Enum.each(fn line -> IO.write(file, line) end)
+      |> Enum.each(fn line ->
+        line = String.replace(line, "\r\n", "\n")
+        IO.write(file, line)
+      end)
     end)
   end
 
