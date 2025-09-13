@@ -29,6 +29,8 @@ defmodule LedgerTest do
     File.write!(transacciones_file, transactions_content)
 
     original_wd = File.cwd!()
+    File.cd!(context.tmp_dir)
+
     on_exit(fn -> File.cd!(original_wd) end)
 
     %{
@@ -54,8 +56,7 @@ defmodule LedgerTest do
       assert output =~ "Debe especificar una cuenta de origen con -c1"
     end
 
-    test "handles transactions subcommand", context do
-      File.cd!(context.tmp_dir)
+    test "handles transactions subcommand" do
       output = capture_io(fn -> Ledger.main(["transacciones"]) end)
       assert output =~ "1;1754937004;USDT;USDT;100.50;userA;userB;transferencia"
     end
