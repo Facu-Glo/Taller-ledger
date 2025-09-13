@@ -8,7 +8,15 @@ defmodule Ledger.MixProject do
       elixir: "~> 1.18",
       escript: [main_module: Ledger],
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.cobertura": :test
+      ]
     ]
   end
 
@@ -23,7 +31,8 @@ defmodule Ledger.MixProject do
   defp deps do
     [
       {:csv, "~> 3.2"},
-      {:decimal, "~> 2.0"}
+      {:decimal, "~> 2.0"},
+      {:excoveralls, "~> 0.18", only: :test}
     ]
   end
 end
