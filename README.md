@@ -7,7 +7,7 @@ Un sistema de libro contable que registra transacciones de diferentes monedas en
 ``` bash
 ledger/
 ├── lib/
-│   ├── ledger.ex                  # Módulo principal y parser de argumentos
+│   ├── ledger.ex                 # Módulo principal y parser de argumentos
 │   └── modulos/
 │      ├── balance_calculator.ex  # Lógica de cálculo de balances
 │      ├── currency_loader.ex     # Carga de monedas desde CSV
@@ -22,6 +22,44 @@ ledger/
 ├── monedas.csv
 ├── transacciones.csv
 └── README.md
+```
+
+El sistema está compuesto por dos archivos CSV principales:
+### monedas.csv
+
+Registro maestro de monedas disponibles y su valor de referencia en USD.
+
+**Formato:**
+```csv
+nombre_moneda;precio_usd
+```
+**Ejemplo**
+```csv
+BTC;55000
+ETH;3000
+ARS;0.0012
+USDT;1
+EUR;1.18
+```
+### transacciones.csv
+
+Registro inmutable de toda la actividad financiera del sistema.
+
+**Formato:**
+```csv
+id_transaccion;timestamp;moneda_origen;moneda_destino;monto;cuenta_origen;cuenta_destino;tipo
+```
+**Tipos de transacciones:**
+
+- `transferencia`: Transfiere un monto de una cuenta a otra
+- `swap`: Convierte un monto de una moneda a otra
+- `alta_cuenta`: Crea una cuenta y fija su valor inicial
+
+**Ejemplo:**
+```csv
+1;1754937004;USDT;USDT;100.50;userA;userB;transferencia
+2;1755541804;BTC;USDT;0.1;userB;;swap
+3;1756751404;BTC;;50000;userC;;alta_cuenta
 ```
 
 ## Compilación y Ejecución
@@ -134,3 +172,10 @@ El sistema maneja los siguientes tipos de errores:
 - **Subcomando faltante**: Se debe especificar `transacciones` o `balance`
 - **Flags inválidos**: Flags no reconocidos o con formato incorrecto
 - **Cuenta origen faltante**: Para el subcomando `balance` es obligatorio especificar `-c1`
+
+## Tests
+#### Ejecutar Tests
+
+```bash
+mix coveralls
+```
