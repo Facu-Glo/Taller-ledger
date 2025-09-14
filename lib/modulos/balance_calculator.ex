@@ -123,7 +123,7 @@ defmodule Ledger.BalanceCalculator do
 
       {:ok, %{target_currency => total}}
     else
-      {:error, :invalid_target_currency}
+      {:error, "Moneada invalida"}
     end
   end
 end

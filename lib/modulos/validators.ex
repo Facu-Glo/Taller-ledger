@@ -9,6 +9,8 @@ defmodule Ledger.Validators do
     end
   end
 
+  def parse_decimal(nil), do: {:error, nil}
+  def parse_decimal(""), do: {:error, nil}
   def parse_decimal(string) do
     case Decimal.parse(string) do
       {decimal, ""} ->
