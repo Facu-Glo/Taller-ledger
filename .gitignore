@@ -23,4 +23,6 @@ leadger-*.tar
 /tmp/
 
 # Ignorar binario
-/leadger
+/ledger
+
+.obsidian/

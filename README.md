@@ -1,21 +1,136 @@
 # Ledger
 
-**TODO: Add description**
+Un sistema de libro contable que registra transacciones de diferentes monedas entre usuarios, utilizando archivos CSV como base de datos.
 
-## Installation
+## Estructura del Proyecto
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `leadger` to your list of dependencies in `mix.exs`:
-
-```elixir
-def deps do
-  [
-    {:leadger, "~> 0.1.0"}
-  ]
-end
+``` bash
+ledger/
+├── lib/
+│   ├── ledger.ex                  # Módulo principal y parser de argumentos
+│   └── modulos/
+│      ├── balance_calculator.ex  # Lógica de cálculo de balances
+│      ├── currency_loader.ex     # Carga de monedas desde CSV
+│      ├── handle_balance.ex      # Manejo del subcomando balance
+│      ├── handle_transactions.ex # Manejo del subcomando transacciones
+│      ├── output_writer.ex       # Escritura de resultados
+│      ├── transaction_reader.ex  # Lectura y filtrado de transacciones
+│      └── validators.ex          # Validaciones de datos
+├── mix.exs   
+├── test/
+│   └── ...
+├── monedas.csv
+├── transacciones.csv
+└── README.md
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/leadger>.
+## Compilación y Ejecución
 
+### Compilación
+
+1. Instalar dependencias
+
+```bash
+mix deps.get
+```
+
+2. Compilar el proyecto
+
+```bash
+mix compile
+```
+
+3. Generar el ejecutable
+
+```bash
+mix escript.build
+```
+
+Esto generará un archivo ejecutable llamado `ledger` en el directorio del proyecto.
+
+### Ejecución
+
+Una vez compilado, el programa se ejecuta con:
+
+```bash
+./ledger <subcomando> [flags]
+```
+
+## Uso
+
+### Sintaxis General
+
+```bash
+./ledger <subcomando> [flags]
+```
+### Subcomandos
+
+**1. transacciones**
+Lista transacciones que cumplen con los filtros especificados.
+
+**2. balance**
+Calcula el balance de una cuenta específica.
+
+
+### Flags Disponibles
+
+| Flag  | Descripción                                             | Obligatorio    |
+| ----- | ------------------------------------------------------- | -------------- |
+| `-c1` | Cuenta origen                                           | Para `balance` |
+| `-c2` | Cuenta destino                                          | No             |
+| `-t`  | Archivo de transacciones (default: `transacciones.csv`) | No             |
+| `-m`  | Moneda para cálculo de balances                         | No             |
+| `-o`  | Archivo de salida (default: terminal)                   | No             |
+## Ejemplos de Uso
+
+### Listar Transacciones
+```bash
+# Listar todas las transacciones
+./ledger transacciones
+
+# Listar transacciones de un archivo específico desde cuenta 345
+./ledger transacciones -t=transac.csv -c1=345 -o=result.csv
+
+# Listar transacciones entre cuentas específicas
+./ledger transacciones -c1=userA -c2=userB
+```
+
+### Consultar Balances
+```bash
+# Balance de todas las monedas de la cuenta 867
+./ledger balance -c1=867
+
+# Balance de la cuenta 867 convertido a BTC
+./ledger balance -c1=867 -m=BTC
+
+# Guardar balance en archivo
+./ledger balance -c1=userA -o=balance_output.csv
+```
+
+## Manejo de Errores
+
+El sistema maneja los siguientes tipos de errores:
+
+### Errores de Formato
+
+- **Líneas malformadas**: `{:error, <nro_linea>}`
+- **IDs de transacción inválidos**: Deben ser números enteros no negativos
+- **Montos inválidos**: Deben ser números decimales no negativos
+- **Tipos de transacción inválidos**: Solo se permiten `transferencia`, `swap`, `alta_cuenta`
+
+### Errores de Validación de Negocio
+
+- **Monedas inexistentes**: Las monedas usadas en transacciones deben existir en `monedas.csv`
+- **Cuentas no creadas**: Las cuentas deben ser creadas con `alta_cuenta` antes de usarse
+- **Swaps inválidos**: En swaps, `moneda_origen` y `moneda_destino` deben ser diferentes
+
+### Errores de Archivos
+
+- **Archivo no encontrado**: Cuando el archivo de transacciones o monedas no existe
+- **Errores de formato CSV**: Problemas al parsear los archivos CSV
+
+### Errores de Comandos
+
+- **Subcomando faltante**: Se debe especificar `transacciones` o `balance`
+- **Flags inválidos**: Flags no reconocidos o con formato incorrecto
+- **Cuenta origen faltante**: Para el subcomando `balance` es obligatorio especificar `-c1`
