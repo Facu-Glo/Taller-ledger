@@ -10,7 +10,7 @@ defmodule Ledger.HandleTransactions do
 
   def load_coins_and_transactions(filename) do
     with {:ok, coins} <- Ledger.CurrencyLoader.load_monedas(),
-         {:ok, transactions} <- Ledger.TransactionReader.read_and_validate_transactions(filename, coins) do
+         {:ok, transactions, _balances} <- Ledger.TransactionReader.read_and_validate_transactions(filename, coins) do
       {:ok, %{coins: coins, transactions: transactions}}
     else
       {:error, reason} -> {:error, reason}

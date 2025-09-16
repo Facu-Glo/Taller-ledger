@@ -1,50 +1,28 @@
 defmodule Ledger.BalanceCalculator do
   def calculate_balance(filename, origin_account, coins, opts) do
-    case Ledger.TransactionReader.read_and_validate_transactions(filename, coins) do
-      {:ok, list_transaction} ->
-        account =
-          filter_for_balance(list_transaction, origin_account)
-
-        balances = compute_balance(account, origin_account, coins)
-
-        case Map.get(opts, :moneda) do
-          nil ->
-            {:ok, balances}
-
-          target_currency ->
-            convert_to_currency(balances, target_currency, coins)
-        end
-
-      {:error, messege} ->
-        {:error, messege}
+    with {:ok, _transactions, balances} <-
+           Ledger.TransactionReader.read_and_validate_transactions(filename, coins),
+         account_balance <- Map.get(balances, origin_account, %{}) do
+      convert_balance_if_needed(account_balance, opts, coins)
     end
   end
 
-  def filter_for_balance(list_transaction, account) do
-    Enum.filter(list_transaction, fn t ->
-      t.cuenta_origen == account or t.cuenta_destino == account
-    end)
-  end
-
-  def compute_balance(accounts, origin_account, coins) do
-    Enum.reduce(accounts, %{}, fn transaction, acc ->
-      apply_transaction(acc, transaction, origin_account, coins)
-    end)
+  defp convert_balance_if_needed(balances, opts, coins) do
+    case Map.get(opts, :moneda) do
+      nil -> {:ok, balances}
+      target -> convert_to_currency(balances, target, coins)
+    end
   end
 
   def update_balance(acc, currency, amount) do
-    Map.update(acc, currency, amount, fn current_value ->
-      Decimal.add(current_value, amount)
+    Map.update(acc, currency, amount, fn currency_value ->
+      Decimal.add(currency_value, amount)
     end)
   end
 
   def apply_transaction(
         acc,
-        %{
-          tipo: "alta_cuenta",
-          moneda_origen: moneda,
-          monto: monto
-        },
+        %{tipo: "alta_cuenta", moneda_origen: moneda, monto: monto},
         _origin_account,
         _coins
       ) do
@@ -67,65 +45,54 @@ defmodule Ledger.BalanceCalculator do
 
   def apply_transaction(
         acc,
-        %{
-          tipo: "swap",
-          moneda_origen: moneda_origen,
-          moneda_destino: moneda_destino,
-          monto: monto
-        },
+        %{tipo: "swap", moneda_origen: moneda_origen, moneda_destino: moneda_destino, monto: monto},
         _origin_account,
         coins
       ) do
-    converted_amount =
-      get_converted_amount(
-        %{moneda_origen: moneda_origen, moneda_destino: moneda_destino, monto: monto},
-        coins
-      )
+    converted =
+      get_converted_amount(%{moneda_origen: moneda_origen, moneda_destino: moneda_destino, monto: monto}, coins)
 
     acc
     |> update_balance(moneda_origen, Decimal.negate(monto))
-    |> update_balance(moneda_destino, converted_amount)
+    |> update_balance(moneda_destino, converted)
   end
 
-  def get_converted_amount(map, coins) do
-    origin_coin = Map.get(coins, map.moneda_origen)
-    destiny_coin = Map.get(coins, map.moneda_destino)
-
+  def get_converted_amount(%{moneda_origen: moneda_origen, moneda_destino: moneda_destino, monto: monto}, coins) do
+    origin_value = Map.get(coins, moneda_origen)
+    dest_value = Map.get(coins, moneda_destino)
     zero = Decimal.new(0)
 
-    if Decimal.compare(destiny_coin, zero) == :gt do
-      map.monto
-      |> Decimal.mult(origin_coin)
-      |> Decimal.div(destiny_coin)
+    if Decimal.compare(dest_value, zero) == :gt do
+      monto |> Decimal.mult(origin_value) |> Decimal.div(dest_value)
     else
       zero
     end
   end
 
   def convert_to_currency(balances, target_currency, coins) do
-    if Map.has_key?(coins, target_currency) do
-      target_value = Map.get(coins, target_currency)
+    with {:ok, target_value} <- Map.fetch(coins, target_currency) do
       zero = Decimal.new(0)
-
-      total =
-        Enum.reduce(balances, zero, fn {currency, amount}, acc ->
-          currency_value = Map.get(coins, currency)
-
-          if Decimal.compare(target_value, zero) == :gt do
-            converted =
-              amount
-              |> Decimal.mult(currency_value)
-              |> Decimal.div(target_value)
-
-            Decimal.add(acc, converted)
-          else
-            acc
-          end
-        end)
-
+      total = calculate_total(balances, coins, target_value, zero)
       {:ok, %{target_currency => total}}
     else
-      {:error, "Moneada invalida"}
+      :error -> {:error, "Moneda inválida"}
     end
+  end
+
+  defp calculate_total(balances, coins, target_value, zero) do
+    Enum.reduce(balances, zero, fn {currency, amount}, acc ->
+      currency_value = Map.get(coins, currency)
+
+      if Decimal.compare(target_value, zero) == :gt do
+        converted =
+          amount
+          |> Decimal.mult(currency_value)
+          |> Decimal.div(target_value)
+
+        Decimal.add(acc, converted)
+      else
+        acc
+      end
+    end)
   end
 end
