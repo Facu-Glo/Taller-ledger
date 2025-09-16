@@ -33,7 +33,9 @@ defmodule Ledger.BalanceCalculator do
   end
 
   def update_balance(acc, currency, amount) do
-    Map.update(acc, currency, amount, fn current_value -> Decimal.add(current_value, amount) end)
+    Map.update(acc, currency, amount, fn current_value ->
+      Decimal.add(current_value, amount)
+    end)
   end
 
   def apply_transaction(
@@ -46,7 +48,7 @@ defmodule Ledger.BalanceCalculator do
         _origin_account,
         _coins
       ) do
-    currency = if moneda != "", do: moneda, else: "USD"
+    currency = (moneda != "" && moneda) || "USD"
     update_balance(acc, currency, monto)
   end
 
