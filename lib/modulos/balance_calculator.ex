@@ -45,19 +45,30 @@ defmodule Ledger.BalanceCalculator do
 
   def apply_transaction(
         acc,
-        %{tipo: "swap", moneda_origen: moneda_origen, moneda_destino: moneda_destino, monto: monto},
+        %{
+          tipo: "swap",
+          moneda_origen: moneda_origen,
+          moneda_destino: moneda_destino,
+          monto: monto
+        },
         _origin_account,
         coins
       ) do
     converted =
-      get_converted_amount(%{moneda_origen: moneda_origen, moneda_destino: moneda_destino, monto: monto}, coins)
+      get_converted_amount(
+        %{moneda_origen: moneda_origen, moneda_destino: moneda_destino, monto: monto},
+        coins
+      )
 
     acc
     |> update_balance(moneda_origen, Decimal.negate(monto))
     |> update_balance(moneda_destino, converted)
   end
 
-  def get_converted_amount(%{moneda_origen: moneda_origen, moneda_destino: moneda_destino, monto: monto}, coins) do
+  def get_converted_amount(
+        %{moneda_origen: moneda_origen, moneda_destino: moneda_destino, monto: monto},
+        coins
+      ) do
     origin_value = Map.get(coins, moneda_origen)
     dest_value = Map.get(coins, moneda_destino)
     zero = Decimal.new(0)

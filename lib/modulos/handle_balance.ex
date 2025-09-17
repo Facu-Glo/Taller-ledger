@@ -4,7 +4,7 @@ defmodule Ledger.HandleBalance do
     |> validate_balance_config()
     |> load_currencies_if_valid()
     |> calculate_balance_if_valid()
-    |> output_result()
+    |> output_balance_result()
   end
 
   def validate_balance_config(config) do
@@ -52,12 +52,12 @@ defmodule Ledger.HandleBalance do
     end
   end
 
-  def output_result({:ok, balance, config}) do
+  def output_balance_result({:ok, balance, config}) do
     Ledger.OutputWriter.output_results_balance(balance, config)
     :ok
   end
 
-  def output_result({:error, message, _config}) do
+  def output_balance_result({:error, message, _config}) do
     IO.puts("Error: #{message}")
     :error
   end

@@ -397,12 +397,13 @@ defmodule LedgerTest do
     test "returns error for invalid transaction type" do
       tx = %{tipo: "compra", moneda_origen: "BTC", moneda_destino: "USDT"}
 
-      assert Ledger.Validators.validate_coins(tx, %{"BTC" => 1, "USDT" => 1}) ==
+      assert Ledger.Validators.validate_transaction_currencies(tx, %{"BTC" => 1, "USDT" => 1}) ==
                {:error, :invalid_type}
     end
 
     test "returns error for completely invalid structure" do
-      assert Ledger.Validators.validate_coins(%{}, %{}) == {:error, :invalid_type}
+      assert Ledger.Validators.validate_transaction_currencies(%{}, %{}) ==
+               {:error, :invalid_type}
     end
 
     test "returns error for nil" do

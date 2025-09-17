@@ -34,7 +34,10 @@ defmodule Ledger.Validators do
 
   def validate_transaction_type(_), do: {:error, :invalid_type}
 
-  def validate_coins(%{tipo: "swap", moneda_origen: origen, moneda_destino: destino}, map_coins)
+  def validate_transaction_currencies(
+        %{tipo: "swap", moneda_origen: origen, moneda_destino: destino},
+        map_coins
+      )
       when origen != destino do
     if Map.has_key?(map_coins, origen) and Map.has_key?(map_coins, destino) do
       :ok
@@ -43,24 +46,27 @@ defmodule Ledger.Validators do
     end
   end
 
-  def validate_coins(
+  def validate_transaction_currencies(
         %{tipo: "transferencia", moneda_origen: moneda, moneda_destino: moneda},
         map_coins
       ) do
     if Map.has_key?(map_coins, moneda), do: :ok, else: {:error, :invalid_coin}
   end
 
-  def validate_coins(%{tipo: "alta_cuenta", moneda_origen: origen, moneda_destino: ""}, map_coins) do
+  def validate_transaction_currencies(
+        %{tipo: "alta_cuenta", moneda_origen: origen, moneda_destino: ""},
+        map_coins
+      ) do
     if Map.has_key?(map_coins, origen), do: :ok, else: {:error, :invalid_coin}
   end
 
-  def validate_coins(_, _), do: {:error, :invalid_type}
+  def validate_transaction_currencies(_, _), do: {:error, :invalid_type}
 
   def validate_transaction_row(row, line_number, map_coins) do
     with {:ok, id} <- parse_integer(row[:id_transaccion]),
          {:ok, money} <- parse_decimal(row[:monto]),
          :ok <- validate_transaction_type(row[:tipo]),
-         :ok <- validate_coins(row, map_coins) do
+         :ok <- validate_transaction_currencies(row, map_coins) do
       {:ok,
        %{
          id: id,
