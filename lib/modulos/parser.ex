@@ -25,7 +25,7 @@ defmodule Ledger.Parser do
     Enum.reduce_while(flags, {:ok, %{}}, fn flag, {:ok, acc} ->
       case String.split(flag, "=", parts: 2) do
         ["-c1", value] ->
-          {:cont, {:ok, Map.put(acc, :cuenta_origen, value)} }
+          {:cont, {:ok, Map.put(acc, :cuenta_origen, value)}}
 
         ["-c2", value] ->
           {:cont, {:ok, Map.put(acc, :cuenta_destino, value)}}

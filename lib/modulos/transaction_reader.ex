@@ -14,32 +14,32 @@ defmodule Ledger.TransactionReader do
         :tipo
       ]
 
-      transaction =
-        File.stream!(filename)
-        |> CSV.decode!(headers: list_headers, separator: ?;)
-        |> Stream.with_index(1)
-        |> Enum.reduce_while([], fn {row, line_number}, acc ->
-          case Ledger.Validators.validate_transaction_row(row, line_number, map_coins) do
-            {:ok, map} ->
-              {:cont, [map | acc]}
-
-            {:error, _} ->
-              {:halt, {:error, line_number}}
-          end
-        end)
-
-      case transaction do
-        {:error, line_number} ->
-          {:error, line_number}
-
-        valid ->
-          reversed_transactions = Enum.reverse(valid)
-
-          case Ledger.Validators.validate_transactions_accounts(reversed_transactions) do
-            :ok -> {:ok, reversed_transactions}
-            {:error, messege} -> {:error, messege}
-          end
+      with {:ok, parsed_transactions} <-
+             parse_and_validate_csv(filename, list_headers, map_coins),
+           :ok <- Ledger.Validators.validate_transactions_accounts(parsed_transactions),
+           {:ok, balances} <- Ledger.Validators.validate_balances(parsed_transactions, map_coins) do
+        {:ok, parsed_transactions, balances}
+      else
+        {:error, reason} -> {:error, reason}
       end
+    end
+  end
+
+  def parse_and_validate_csv(filename, list_headers, map_coins) do
+    transaction_result =
+      File.stream!(filename)
+      |> CSV.decode!(headers: list_headers, separator: ?;)
+      |> Stream.with_index(1)
+      |> Enum.reduce_while([], fn {row, line_number}, acc ->
+        case Ledger.Validators.validate_transaction_row(row, line_number, map_coins) do
+          {:ok, map} -> {:cont, [map | acc]}
+          {:error, _} -> {:halt, {:error, line_number}}
+        end
+      end)
+
+    case transaction_result do
+      {:error, line_number} -> {:error, line_number}
+      valid_transactions -> {:ok, Enum.reverse(valid_transactions)}
     end
   end
 

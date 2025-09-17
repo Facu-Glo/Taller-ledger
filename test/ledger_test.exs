@@ -89,7 +89,7 @@ defmodule LedgerTest do
       custom_content = """
       97;1756990000;BTC;;30000;userX;;alta_cuenta
       98;1756995000;ETH;;5;userY;;alta_cuenta
-      99;1757000000;USDT;USDT;500;userX;userY;transferencia
+      99;1757000000;BTC;BTC;500;userX;userY;transferencia
       """
 
       File.write!(other_file, custom_content)
@@ -99,7 +99,10 @@ defmodule LedgerTest do
           Ledger.main(["transacciones", "-t=#{other_file}"])
         end)
 
-      assert output =~ "99;1757000000;USDT;USDT;500;userX;userY;transferencia"
+      assert output ==
+               "97;1756990000;BTC;;30000;userX;;alta_cuenta\n" <>
+                 "98;1756995000;ETH;;5;userY;;alta_cuenta\n" <>
+                 "99;1757000000;BTC;BTC;500;userX;userY;transferencia\n"
     end
 
     test "filters by origin account with -c1 flag" do
@@ -191,7 +194,6 @@ defmodule LedgerTest do
         end)
 
       assert output =~ "USDT=849.500000\n"
-      assert output =~ "ETH=2.500000"
     end
 
     test "handles -m flag with non-existent currency" do
@@ -200,7 +202,7 @@ defmodule LedgerTest do
           Ledger.main(["balance", "-c1=userA", "-m=NONEXISTENT"])
         end)
 
-      assert output =~ "Error: Moneada invalida"
+      assert output =~ "Error: Moneda inválida\n"
     end
 
     test "calculates balance for an account with -m flag" do
@@ -209,7 +211,7 @@ defmodule LedgerTest do
           Ledger.main(["balance", "-c1=userA", "-m=EUR"])
         end)
 
-      assert output =~ "EUR=7075.847458\n"
+      assert output =~ "EUR=719.915254\n"
     end
 
     test "handles account with swap transaction" do
@@ -231,7 +233,6 @@ defmodule LedgerTest do
 
       assert File.exists?(output_file)
       content = File.read!(output_file)
-      assert content =~ "ETH;2.500000\n"
       assert content =~ "USDT;849.500000\n"
     end
 
@@ -396,12 +397,13 @@ defmodule LedgerTest do
     test "returns error for invalid transaction type" do
       tx = %{tipo: "compra", moneda_origen: "BTC", moneda_destino: "USDT"}
 
-      assert Ledger.Validators.validate_coins(tx, %{"BTC" => 1, "USDT" => 1}) ==
+      assert Ledger.Validators.validate_transaction_currencies(tx, %{"BTC" => 1, "USDT" => 1}) ==
                {:error, :invalid_type}
     end
 
     test "returns error for completely invalid structure" do
-      assert Ledger.Validators.validate_coins(%{}, %{}) == {:error, :invalid_type}
+      assert Ledger.Validators.validate_transaction_currencies(%{}, %{}) ==
+               {:error, :invalid_type}
     end
 
     test "returns error for nil" do

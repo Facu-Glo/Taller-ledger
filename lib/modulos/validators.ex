@@ -11,6 +11,7 @@ defmodule Ledger.Validators do
 
   def parse_decimal(nil), do: {:error, nil}
   def parse_decimal(""), do: {:error, nil}
+
   def parse_decimal(string) do
     case Decimal.parse(string) do
       {decimal, ""} ->
@@ -33,7 +34,10 @@ defmodule Ledger.Validators do
 
   def validate_transaction_type(_), do: {:error, :invalid_type}
 
-  def validate_coins(%{tipo: "swap", moneda_origen: origen, moneda_destino: destino}, map_coins)
+  def validate_transaction_currencies(
+        %{tipo: "swap", moneda_origen: origen, moneda_destino: destino},
+        map_coins
+      )
       when origen != destino do
     if Map.has_key?(map_coins, origen) and Map.has_key?(map_coins, destino) do
       :ok
@@ -42,24 +46,27 @@ defmodule Ledger.Validators do
     end
   end
 
-  def validate_coins(
+  def validate_transaction_currencies(
         %{tipo: "transferencia", moneda_origen: moneda, moneda_destino: moneda},
         map_coins
       ) do
     if Map.has_key?(map_coins, moneda), do: :ok, else: {:error, :invalid_coin}
   end
 
-  def validate_coins(%{tipo: "alta_cuenta", moneda_origen: origen, moneda_destino: ""}, map_coins) do
+  def validate_transaction_currencies(
+        %{tipo: "alta_cuenta", moneda_origen: origen, moneda_destino: ""},
+        map_coins
+      ) do
     if Map.has_key?(map_coins, origen), do: :ok, else: {:error, :invalid_coin}
   end
 
-  def validate_coins(_, _), do: {:error, :invalid_type}
+  def validate_transaction_currencies(_, _), do: {:error, :invalid_type}
 
   def validate_transaction_row(row, line_number, map_coins) do
     with {:ok, id} <- parse_integer(row[:id_transaccion]),
          {:ok, money} <- parse_decimal(row[:monto]),
          :ok <- validate_transaction_type(row[:tipo]),
-         :ok <- validate_coins(row, map_coins) do
+         :ok <- validate_transaction_currencies(row, map_coins) do
       {:ok,
        %{
          id: id,
@@ -107,6 +114,38 @@ defmodule Ledger.Validators do
 
       _ ->
         validate_account_creation(rest, account_set)
+    end
+  end
+
+  def validate_positive_balances(balances) do
+    Enum.reduce_while(balances, :ok, fn {account, account_balances}, _acc ->
+      case Enum.find(account_balances, fn {_currency, amount} ->
+             Decimal.compare(amount, 0) == :lt
+           end) do
+        nil -> {:cont, :ok}
+        {currency, _} -> {:halt, {:error, {account, currency}}}
+      end
+    end)
+  end
+
+  def validate_balances(transactions, map_coins) do
+    balances =
+      Enum.reduce(transactions, %{}, fn tx, acc ->
+        account = tx.cuenta_origen || tx.cuenta_destino
+        current_balance = Map.get(acc, account, %{})
+
+        updated_balance =
+          Ledger.BalanceCalculator.apply_transaction(current_balance, tx, account, map_coins)
+
+        Map.put(acc, account, updated_balance)
+      end)
+
+    case validate_positive_balances(balances) do
+      :ok ->
+        {:ok, balances}
+
+      {:error, {account, _}} ->
+        {:error, "Se detectó un balance negativo en la cuenta de #{account}"}
     end
   end
 end
