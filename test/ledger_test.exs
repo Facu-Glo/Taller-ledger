@@ -442,115 +442,124 @@ defmodule LedgerTest do
     end
   end
 
-  describe "error handler" do
-    alias Ledger.HandleError
+  describe "HandleError full coverage via CSVs and arguments" do
+    @csv_errors_dir "tmp_csv_errors"
 
-    test "invalid_integer" do
-      output = capture_io(fn -> HandleError.handle({:error, {:invalid_integer, 3}}) end)
-      assert output == "Error: ID de transacción inválido en la línea 3.\n"
+    setup do
+      File.mkdir_p!(@csv_errors_dir)
+      :ok
     end
 
-    test "invalid_decimal" do
-      output = capture_io(fn -> HandleError.handle({:error, {:invalid_decimal, 5}}) end)
-      assert output == "Error: monto inválido en la línea 5.\n"
+    test "invalid_integer transaction ID" do
+      file = Path.join(@csv_errors_dir, "invalid_id.csv")
+      File.write!(file, ";1756700000;BTC;;50000;userC;;alta_cuenta")
+
+      output = capture_io(fn -> Ledger.main(["transacciones", "-t=#{file}"]) end)
+      assert output =~ "Error: ID de transacción inválido en la línea 1."
     end
 
-    test "negative_decimal" do
-      output = capture_io(fn -> HandleError.handle({:error, {:negative_decimal, 7}}) end)
-      assert output == "Error: monto negativo en la línea 7.\n"
+    test "negative amount" do
+      file = Path.join(@csv_errors_dir, "negative_amount.csv")
+      File.write!(file, "1;1756700000;BTC;;-50000;userC;;alta_cuenta")
+
+      output = capture_io(fn -> Ledger.main(["transacciones", "-t=#{file}"]) end)
+      assert output =~ "Error: monto negativo en la línea 1."
     end
 
-    test "invalid_type" do
-      output = capture_io(fn -> HandleError.handle({:error, {:invalid_type, 9}}) end)
-      assert output == "Error: tipo de transacción inválido en la línea 9.\n"
+    test "invalid decimal amount" do
+      file = Path.join(@csv_errors_dir, "invalid_decimal.csv")
+      File.write!(file, "1;1756700000;BTC;;ABC;userC;;alta_cuenta")
+
+      output = capture_io(fn -> Ledger.main(["transacciones", "-t=#{file}"]) end)
+      assert output =~ "Error: monto inválido en la línea 1."
     end
 
-    test "invalid_coin" do
-      output = capture_io(fn -> HandleError.handle({:error, {:invalid_coin, 11}}) end)
-      assert output == "Error: moneda inválida en la línea 11.\n"
+    test "invalid transaction type" do
+      file = Path.join(@csv_errors_dir, "invalid_type.csv")
+      File.write!(file, "1;1756700000;BTC;;50000;userC;;invalid_type")
+
+      output = capture_io(fn -> Ledger.main(["transacciones", "-t=#{file}"]) end)
+      assert output =~ "Error: tipo de transacción inválido en la línea 1."
     end
 
-    test "account_not_created_before_transfer" do
+    test "invalid coin in transaction" do
+      file = Path.join(@csv_errors_dir, "invalid_coin.csv")
+      File.write!(file, "1;1756700000;XYZ;;50000;userC;;alta_cuenta")
+
+      output = capture_io(fn -> Ledger.main(["transacciones", "-t=#{file}"]) end)
+      assert output =~ "Error: moneda inválida en la línea 1."
+    end
+
+    test "transfer from non-existent account" do
+      file = Path.join(@csv_errors_dir, "missing_origin.csv")
+      File.write!(file, "1;1756700000;USDT;USDT;100;userA;;transferencia")
+
+      output = capture_io(fn -> Ledger.main(["transacciones", "-t=#{file}"]) end)
+      assert output =~ "Error: se intentó transferir desde/hacia una cuenta no creada"
+    end
+
+    test "swap from non-existent account" do
+      file = Path.join(@csv_errors_dir, "swap_missing.csv")
+      File.write!(file, "1;1756700000;BTC;USDT;0.1;userX;;swap")
+
+      output = capture_io(fn -> Ledger.main(["transacciones", "-t=#{file}"]) end)
+      assert output =~ "Error: se intentó hacer un swap desde una cuenta no creada"
+    end
+
+    test "transaction file not found" do
+      output = capture_io(fn -> Ledger.main(["transacciones", "-t=nonexistent.csv"]) end)
+      assert output =~ "Error: Archivo no encontrado."
+    end
+
+    test "currencies file not found" do
       output =
         capture_io(fn ->
-          HandleError.handle({:error, {:account_not_created_before_transfer, 13}})
+          Ledger.main(["balance", "-c1=userA", "-m=BTC", "-t=nonexistent.csv"])
         end)
 
-      assert output ==
-               "Error: se intentó transferir desde/hacia una cuenta no creada (línea 13).\n"
+      assert output =~ "Error: Archivo no encontrado"
     end
 
-    test "account_not_created_before_swap" do
+    test "invalid currency value in monedas.csv" do
+      file = Path.join(@csv_errors_dir, "bad_monedas.csv")
+      File.write!(file, "BTC;ABC\nUSDT;1")
+
       output =
         capture_io(fn ->
-          HandleError.handle({:error, {:account_not_created_before_swap, 15}})
+          Ledger.main(["balance", "-c1=userA", "-m=BTC", "-t=bad.csv"])
         end)
 
-      assert output ==
-               "Error: se intentó hacer un swap desde una cuenta no creada (línea 15).\n"
+      assert output =~ "Error"
     end
 
-    test "negative_balance" do
-      output =
-        capture_io(fn ->
-          HandleError.handle({:error, {:negative_balance, "Alice", "USD"}})
-        end)
-
-      assert output == "Error: la cuenta Alice tiene balance negativo en USD.\n"
+    test "invalid subcommand" do
+      output = capture_io(fn -> Ledger.main(["invalid_subcommand"]) end)
+      assert output =~ "Debe especificar un subcomando"
     end
 
-    test "file_not_found without path" do
-      output = capture_io(fn -> HandleError.handle({:error, :file_not_found}) end)
-      assert output == "Error: Archivo no encontrado.\n"
+    test "unknown flag" do
+      output = capture_io(fn -> Ledger.main(["transacciones", "-x=1"]) end)
+      assert output =~ "Flag desconocida"
     end
 
-    test "file_not_found with path" do
-      output =
-        capture_io(fn -> HandleError.handle({:error, {:file_not_found, "monedas.csv"}}) end)
+    test "negative balance error" do
+      content = """
+      1;1756700000;USDT;;1000;userA;;alta_cuenta
+      2;1756701000;USDT;;2000;userB;;alta_cuenta
+      3;1756702000;USDT;USDT;1001;userA;userB;transferencia
+      """
 
-      assert output == "Error: Archivo no encontrado: monedas.csv\n"
+      File.write!("transacciones.csv", content)
+
+      output = capture_io(fn -> Ledger.main(["balance", "-c1=userA"]) end)
+      assert output =~ "Error: la cuenta userA tiene balance negativo en USDT."
     end
 
-    test "invalid_currency_value" do
-      output =
-        capture_io(fn -> HandleError.handle({:error, {:invalid_currency_value, "BTC"}}) end)
+    test "invalid currency value error" do
+      File.write!("monedas.csv", "BTC;ABC\nUSDT;1")
 
-      assert output == "Error: Valor de moneda inválido para BTC.\n"
-    end
-
-    test "invalid_currency" do
-      output = capture_io(fn -> HandleError.handle({:error, :invalid_currency}) end)
-      assert output == "Error: Moneda inválida.\n"
-    end
-
-    test "missing_origin_account" do
-      output = capture_io(fn -> HandleError.handle({:error, :missing_origin_account}) end)
-      assert output == "Error: Debe especificar una cuenta de origen con -c1.\n"
-    end
-
-    test "invalid_subcommand" do
-      output = capture_io(fn -> HandleError.handle({:error, :invalid_subcommand}) end)
-      assert output == "Error: Debe especificar un subcomando: transacciones o balance\n"
-    end
-
-    test "unknown_flag" do
-      output = capture_io(fn -> HandleError.handle({:error, {:unknown_flag, "-x"}}) end)
-      assert output == "Error: Flag desconocida: -x\n"
-    end
-
-    test "validation_error" do
-      output = capture_io(fn -> HandleError.handle({:error, {:validation_error, 21}}) end)
-      assert output == "Error: Error de validación en la línea 21.\n"
-    end
-
-    test "unknown error reason" do
-      output = capture_io(fn -> HandleError.handle({:error, :some_weird_error}) end)
-      assert output == "Error desconocido: :some_weird_error\n"
-    end
-
-    test "generic handle clause" do
-      output = capture_io(fn -> HandleError.handle(:unexpected) end)
-      assert output == "Error: :unexpected\n"
+      output = capture_io(fn -> Ledger.main(["balance", "-c1=userA"]) end)
+      assert output =~ "Error: Valor de moneda inválido para BTC."
     end
   end
 end

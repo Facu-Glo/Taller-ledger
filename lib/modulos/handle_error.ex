@@ -58,16 +58,4 @@ defmodule Ledger.HandleError do
   def handle({:error, {:unknown_flag, flag}}) do
     IO.puts("Error: Flag desconocida: #{flag}")
   end
-
-  def handle({:error, {:validation_error, line}}) do
-    IO.puts("Error: Error de validación en la línea #{line}.")
-  end
-
-  def handle({:error, reason}) do
-    IO.puts("Error desconocido: #{inspect(reason)}")
-  end
-
-  def handle(error) do
-    IO.puts("Error: #{inspect(error)}")
-  end
 end

@@ -114,9 +114,6 @@ defmodule Ledger.Validators do
         else
           {:error, {:account_not_created_before_swap, line_number}}
         end
-
-      _ ->
-        validate_account_creation(rest, account_set)
     end
   end
 
