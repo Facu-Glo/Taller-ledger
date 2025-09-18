@@ -170,7 +170,7 @@ defmodule LedgerTest do
           Ledger.main(["transacciones", "-t=nonexistent.csv"])
         end)
 
-      assert output =~ "Error: File not found"
+      assert output =~ "Error: Archivo no encontrado."
     end
 
     test "outputs to a file with -o flag", context do
@@ -202,7 +202,7 @@ defmodule LedgerTest do
           Ledger.main(["balance", "-c1=userA", "-m=NONEXISTENT"])
         end)
 
-      assert output =~ "Error: Moneda inválida\n"
+      assert output =~ "Error: Moneda inválida."
     end
 
     test "calculates balance for an account with -m flag" do
@@ -241,7 +241,7 @@ defmodule LedgerTest do
       coins = %{"USD" => Decimal.new(1)}
 
       assert Ledger.BalanceCalculator.calculate_balance(filename, "userA", coins, %{}) ==
-               {:error, "File not found"}
+               {:error, :file_not_found}
     end
 
     test "apply_transaction leaves acc unchanged if transaction is irrelevant to account" do
@@ -261,6 +261,25 @@ defmodule LedgerTest do
         })
 
       assert result == acc
+    end
+
+    test "apply_transaction updates balance when account is the destination" do
+      acc = %{"USD" => Decimal.new(100)}
+
+      transaction = %{
+        tipo: "transferencia",
+        cuenta_origen: "userB",
+        cuenta_destino: "userA",
+        moneda_origen: "USD",
+        monto: Decimal.new(50)
+      }
+
+      result =
+        Ledger.BalanceCalculator.apply_transaction(acc, transaction, "userA", %{
+          "USD" => Decimal.new(1)
+        })
+
+      assert result["USD"] == Decimal.new(150)
     end
 
     test "get_converted_amount returns zero if destiny coin is zero" do
@@ -289,7 +308,7 @@ defmodule LedgerTest do
       File.write!("transacciones.csv", invalid_content)
 
       output = capture_io(fn -> Ledger.main(["transacciones"]) end)
-      assert output =~ "{:error, 1}"
+      assert output =~ "Error:"
     end
 
     test "handles negative amounts" do
@@ -300,7 +319,7 @@ defmodule LedgerTest do
       File.write!("transacciones.csv", invalid_content)
 
       output = capture_io(fn -> Ledger.main(["transacciones"]) end)
-      assert output =~ "{:error, 1}"
+      assert output =~ "Error: monto negativo en la línea 1."
     end
 
     test "handles invalid currency in transactions" do
@@ -311,7 +330,7 @@ defmodule LedgerTest do
       File.write!("transacciones.csv", invalid_content)
 
       output = capture_io(fn -> Ledger.main(["transacciones"]) end)
-      assert output =~ "{:error, 1}"
+      assert output =~ "Error: moneda inválida en la línea 1."
     end
 
     test "hanles invalid transaction type" do
@@ -322,7 +341,7 @@ defmodule LedgerTest do
       File.write!("transacciones.csv", invalid_content)
 
       output = capture_io(fn -> Ledger.main(["transacciones"]) end)
-      assert output =~ "{:error, 1}"
+      assert output =~ "Error: tipo de transacción inválido en la línea 1."
     end
 
     test "handle without account for transfer" do
@@ -333,7 +352,7 @@ defmodule LedgerTest do
       File.write!("transacciones.csv", invalid_content)
 
       output = capture_io(fn -> Ledger.main(["transacciones"]) end)
-      assert output =~ "Error: account not created before transfer\n"
+      assert output =~ "Error: se intentó transferir desde/hacia una cuenta no creada"
     end
 
     test "handles empty account" do
@@ -343,7 +362,7 @@ defmodule LedgerTest do
 
       File.write!("transacciones.csv", invalid_content)
       output = capture_io(fn -> Ledger.main(["transacciones"]) end)
-      assert output =~ "Error: account not created before transfer\n"
+      assert output =~ "Error: se intentó transferir desde/hacia una cuenta no creada"
     end
   end
 
@@ -352,13 +371,13 @@ defmodule LedgerTest do
       File.rm!("monedas.csv")
 
       output = capture_io(fn -> Ledger.main(["balance", "-c1=userA"]) end)
-      assert output =~ "Error: File not found"
+      assert output =~ "Error: Archivo no encontrado: monedas.csv"
     end
 
     test "handles missing transactions file" do
       File.rm!("transacciones.csv")
       output = capture_io(fn -> Ledger.main(["transacciones"]) end)
-      assert output =~ "Error: File not found"
+      assert output =~ "Error: Archivo no encontrado."
     end
 
     test "returns error when file does not exist" do
@@ -372,26 +391,26 @@ defmodule LedgerTest do
     end
 
     test "fails if monedas.csv cannot be parsed" do
-      invalid_content = "este;no;es;un;csv\notra;linea"
+      bad_file = "bad_monedas.csv"
+      File.write!(bad_file, "BTC;ABC\nUSDT;1")
 
-      File.write!("monedas_invalida.csv", invalid_content)
-
-      assert {:error, message} = Ledger.CurrencyLoader.load_monedas("monedas_invalida.csv")
-      assert message =~ "Invalid"
+      assert Ledger.CurrencyLoader.load_monedas(bad_file) ==
+               {:error, {:invalid_currency_value, "BTC"}}
     end
 
     test "fails if csv is invalid" do
       invalid_content = "1 no es un csv valido"
       File.write!("monedas_invalida.csv", invalid_content)
-      assert {:error, message} = Ledger.CurrencyLoader.load_monedas("monedas_invalida.csv")
-      assert message =~ "Invalid"
+
+      assert {:error, {:invalid_currency_value, "1 no es un csv valido"}} =
+               Ledger.CurrencyLoader.load_monedas("monedas_invalida.csv")
     end
 
     test "operations id is nil" do
       invalid_content = ";1756700000;BTC;;50000;userC;;alta_cuenta"
       File.write!("transacciones.csv", invalid_content)
       output = capture_io(fn -> Ledger.main(["transacciones"]) end)
-      assert output =~ "{:error, 1}"
+      assert output =~ "Error: ID de transacción inválido en la línea 1."
     end
 
     test "returns error for invalid transaction type" do
@@ -407,19 +426,131 @@ defmodule LedgerTest do
     end
 
     test "returns error for nil" do
-      assert Ledger.Validators.parse_integer(nil) == {:error, nil}
+      assert Ledger.Validators.parse_integer(nil) == {:error, :invalid_integer}
     end
 
     test "returns error for empty string integer" do
-      assert Ledger.Validators.parse_integer("") == {:error, nil}
+      assert Ledger.Validators.parse_integer("") == {:error, :invalid_integer}
     end
 
     test "returns error for empty string decimal" do
-      assert Ledger.Validators.parse_decimal("") == {:error, nil}
+      assert Ledger.Validators.parse_decimal("") == {:error, :invalid_decimal}
     end
 
     test "returns error for non-numeric string" do
-      assert Ledger.Validators.parse_integer("abc") == {:error, nil}
+      assert Ledger.Validators.parse_integer("abc") == {:error, :invalid_integer}
+    end
+  end
+
+  describe "error handler" do
+    alias Ledger.HandleError
+
+    test "invalid_integer" do
+      output = capture_io(fn -> HandleError.handle({:error, {:invalid_integer, 3}}) end)
+      assert output == "Error: ID de transacción inválido en la línea 3.\n"
+    end
+
+    test "invalid_decimal" do
+      output = capture_io(fn -> HandleError.handle({:error, {:invalid_decimal, 5}}) end)
+      assert output == "Error: monto inválido en la línea 5.\n"
+    end
+
+    test "negative_decimal" do
+      output = capture_io(fn -> HandleError.handle({:error, {:negative_decimal, 7}}) end)
+      assert output == "Error: monto negativo en la línea 7.\n"
+    end
+
+    test "invalid_type" do
+      output = capture_io(fn -> HandleError.handle({:error, {:invalid_type, 9}}) end)
+      assert output == "Error: tipo de transacción inválido en la línea 9.\n"
+    end
+
+    test "invalid_coin" do
+      output = capture_io(fn -> HandleError.handle({:error, {:invalid_coin, 11}}) end)
+      assert output == "Error: moneda inválida en la línea 11.\n"
+    end
+
+    test "account_not_created_before_transfer" do
+      output =
+        capture_io(fn ->
+          HandleError.handle({:error, {:account_not_created_before_transfer, 13}})
+        end)
+
+      assert output ==
+               "Error: se intentó transferir desde/hacia una cuenta no creada (línea 13).\n"
+    end
+
+    test "account_not_created_before_swap" do
+      output =
+        capture_io(fn ->
+          HandleError.handle({:error, {:account_not_created_before_swap, 15}})
+        end)
+
+      assert output ==
+               "Error: se intentó hacer un swap desde una cuenta no creada (línea 15).\n"
+    end
+
+    test "negative_balance" do
+      output =
+        capture_io(fn ->
+          HandleError.handle({:error, {:negative_balance, "Alice", "USD"}})
+        end)
+
+      assert output == "Error: la cuenta Alice tiene balance negativo en USD.\n"
+    end
+
+    test "file_not_found without path" do
+      output = capture_io(fn -> HandleError.handle({:error, :file_not_found}) end)
+      assert output == "Error: Archivo no encontrado.\n"
+    end
+
+    test "file_not_found with path" do
+      output =
+        capture_io(fn -> HandleError.handle({:error, {:file_not_found, "monedas.csv"}}) end)
+
+      assert output == "Error: Archivo no encontrado: monedas.csv\n"
+    end
+
+    test "invalid_currency_value" do
+      output =
+        capture_io(fn -> HandleError.handle({:error, {:invalid_currency_value, "BTC"}}) end)
+
+      assert output == "Error: Valor de moneda inválido para BTC.\n"
+    end
+
+    test "invalid_currency" do
+      output = capture_io(fn -> HandleError.handle({:error, :invalid_currency}) end)
+      assert output == "Error: Moneda inválida.\n"
+    end
+
+    test "missing_origin_account" do
+      output = capture_io(fn -> HandleError.handle({:error, :missing_origin_account}) end)
+      assert output == "Error: Debe especificar una cuenta de origen con -c1.\n"
+    end
+
+    test "invalid_subcommand" do
+      output = capture_io(fn -> HandleError.handle({:error, :invalid_subcommand}) end)
+      assert output == "Error: Debe especificar un subcomando: transacciones o balance\n"
+    end
+
+    test "unknown_flag" do
+      output = capture_io(fn -> HandleError.handle({:error, {:unknown_flag, "-x"}}) end)
+      assert output == "Error: Flag desconocida: -x\n"
+    end
+
+    test "validation_error" do
+      output = capture_io(fn -> HandleError.handle({:error, {:validation_error, 21}}) end)
+      assert output == "Error: Error de validación en la línea 21.\n"
+    end
+
+    test "unknown error reason" do
+      output = capture_io(fn -> HandleError.handle({:error, :some_weird_error}) end)
+      assert output == "Error desconocido: :some_weird_error\n"
+    end
+
+    test "generic handle clause" do
+      output = capture_io(fn -> HandleError.handle(:unexpected) end)
+      assert output == "Error: :unexpected\n"
     end
   end
 end

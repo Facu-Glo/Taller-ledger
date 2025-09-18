@@ -1,7 +1,7 @@
 defmodule Ledger.TransactionReader do
   def read_and_validate_transactions(filename, map_coins) do
     if not File.exists?(filename) do
-      {:error, "File not found"}
+      {:error, :file_not_found}
     else
       list_headers = [
         :id_transaccion,
