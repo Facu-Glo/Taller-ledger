@@ -40,8 +40,6 @@ defmodule Ledger.OutputWriter do
   end
 
   def write_to_file_balance(data, filename) do
-    IO.inspect(data)
-
     content =
       Enum.map(data, fn {currency, amount} ->
         "#{currency};#{Decimal.round(amount, 6)}\n"
