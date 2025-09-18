@@ -1,24 +1,24 @@
 defmodule Ledger.Parser do
   def parser_args([]) do
-    {:error, "Debe especificar un subcomando: transacciones o balance"}
+    {:error, :invalid_subcommand}
   end
 
   def parser_args(["transacciones" | flags]) do
     case parser_flags(flags) do
       {:ok, config} -> {:transacciones, config}
-      {:error, reason} -> {:error, reason}
+      error -> error
     end
   end
 
   def parser_args(["balance" | flags]) do
     case parser_flags(flags) do
       {:ok, config} -> {:balance, config}
-      {:error, reason} -> {:error, reason}
+      error -> error
     end
   end
 
   def parser_args(_) do
-    {:error, "Debe especificar un subcomando: transacciones o balance"}
+    {:error, :invalid_subcommand}
   end
 
   def parser_flags(flags) do
@@ -40,7 +40,7 @@ defmodule Ledger.Parser do
           {:cont, {:ok, Map.put(acc, :archivo_salida, value)}}
 
         _ ->
-          {:halt, {:error, "Flag desconocida: #{flag}"}}
+          {:halt, {:error, {:unknown_flag, flag}}}
       end
     end)
   end

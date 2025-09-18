@@ -20,7 +20,7 @@ defmodule Ledger.TransactionReader do
            {:ok, balances} <- Ledger.Validators.validate_balances(parsed_transactions, map_coins) do
         {:ok, parsed_transactions, balances}
       else
-        {:error, reason} -> {:error, reason}
+        error -> error
       end
     end
   end
@@ -33,12 +33,12 @@ defmodule Ledger.TransactionReader do
       |> Enum.reduce_while([], fn {row, line_number}, acc ->
         case Ledger.Validators.validate_transaction_row(row, line_number, map_coins) do
           {:ok, map} -> {:cont, [map | acc]}
-          {:error, _} -> {:halt, {:error, line_number}}
+          error -> {:halt, error}
         end
       end)
 
     case transaction_result do
-      {:error, line_number} -> {:error, line_number}
+      {:error, _} = error -> error
       valid_transactions -> {:ok, Enum.reverse(valid_transactions)}
     end
   end
@@ -46,7 +46,7 @@ defmodule Ledger.TransactionReader do
   def filter_origin_account(list_transaction, nil), do: list_transaction
 
   def filter_origin_account(list_transaction, cuenta_origen) do
-    Enum.filter(list_transaction, fn transaction ->
+    Enum.filter(list_transaction, fn {transaction, _line_number} ->
       transaction.cuenta_origen == cuenta_origen
     end)
   end
@@ -54,7 +54,7 @@ defmodule Ledger.TransactionReader do
   def filter_destination_account(list_transaction, nil), do: list_transaction
 
   def filter_destination_account(list_transaction, cuenta_destino) do
-    Enum.filter(list_transaction, fn transaction ->
+    Enum.filter(list_transaction, fn {transaction, _line_number} ->
       transaction.cuenta_destino == cuenta_destino
     end)
   end

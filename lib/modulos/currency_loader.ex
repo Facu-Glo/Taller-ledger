@@ -5,7 +5,7 @@ defmodule Ledger.CurrencyLoader do
          {:ok, currencies} <- process_currency_rows(rows) do
       {:ok, currencies}
     else
-      {:error, reason} -> {:error, reason}
+      error -> error
     end
   end
 
@@ -13,7 +13,7 @@ defmodule Ledger.CurrencyLoader do
     if File.exists?(path) do
       {:ok, :file_exists}
     else
-      {:error, "File not found: #{path}"}
+      {:error, {:file_not_found, path}}
     end
   end
 
@@ -35,7 +35,7 @@ defmodule Ledger.CurrencyLoader do
           {:cont, {:ok, Map.put(acc, row[:moneda], value)}}
 
         _ ->
-          {:halt, {:error, "Invalid currency value for #{row[:moneda]}"}}
+          {:halt, {:error, {:invalid_currency_value, row[:moneda]}}}
       end
     end)
   end

@@ -3,7 +3,7 @@ defmodule Ledger do
     case Ledger.Parser.parser_args(args) do
       {:transacciones, config} -> Ledger.HandleTransactions.handle_transactions(config)
       {:balance, config} -> Ledger.HandleBalance.handle_balance(config)
-      {:error, msg} -> IO.puts("Error: #{msg}")
+      {:error, error} -> Ledger.HandleError.handle({:error, error})
     end
   end
 end

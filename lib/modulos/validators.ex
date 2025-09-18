@@ -1,16 +1,16 @@
 defmodule Ledger.Validators do
-  def parse_integer(nil), do: {:error, nil}
-  def parse_integer(""), do: {:error, nil}
+  def parse_integer(nil), do: {:error, :invalid_integer}
+  def parse_integer(""), do: {:error, :invalid_integer}
 
   def parse_integer(str) do
     case Integer.parse(str) do
       {int, ""} when int >= 0 -> {:ok, int}
-      _ -> {:error, nil}
+      _ -> {:error, :invalid_integer}
     end
   end
 
-  def parse_decimal(nil), do: {:error, nil}
-  def parse_decimal(""), do: {:error, nil}
+  def parse_decimal(nil), do: {:error, :invalid_decimal}
+  def parse_decimal(""), do: {:error, :invalid_decimal}
 
   def parse_decimal(string) do
     case Decimal.parse(string) do
@@ -20,11 +20,11 @@ defmodule Ledger.Validators do
         if Decimal.compare(decimal, zero) != :lt do
           {:ok, decimal}
         else
-          {:error, nil}
+          {:error, :negative_decimal}
         end
 
       _ ->
-        {:error, nil}
+        {:error, :invalid_decimal}
     end
   end
 
@@ -67,31 +67,34 @@ defmodule Ledger.Validators do
          {:ok, money} <- parse_decimal(row[:monto]),
          :ok <- validate_transaction_type(row[:tipo]),
          :ok <- validate_transaction_currencies(row, map_coins) do
-      {:ok,
-       %{
-         id: id,
-         timestamp: row[:timestamp],
-         moneda_origen: row[:moneda_origen],
-         moneda_destino: row[:moneda_destino],
-         monto: money,
-         cuenta_origen: row[:cuenta_origen],
-         cuenta_destino: row[:cuenta_destino],
-         tipo: row[:tipo]
-       }}
+      transaction = %{
+        id: id,
+        timestamp: row[:timestamp],
+        moneda_origen: row[:moneda_origen],
+        moneda_destino: row[:moneda_destino],
+        monto: money,
+        cuenta_origen: row[:cuenta_origen],
+        cuenta_destino: row[:cuenta_destino],
+        tipo: row[:tipo]
+      }
+
+      {:ok, {transaction, line_number}}
     else
-      _ -> {:error, line_number}
+      {:error, reason} -> {:error, {reason, line_number}}
     end
   end
 
   def validate_transactions_accounts(transactions) do
-    sorted_transactions = Enum.sort_by(transactions, fn transaction -> transaction.timestamp end)
+    sorted_transactions =
+      Enum.sort_by(transactions, fn {transaction, _number} -> transaction.timestamp end)
+
     set = MapSet.new()
     validate_account_creation(sorted_transactions, set)
   end
 
   def validate_account_creation([], _account_set), do: :ok
 
-  def validate_account_creation([transaction | rest], account_set) do
+  def validate_account_creation([{transaction, line_number} | rest], account_set) do
     case transaction.tipo do
       "alta_cuenta" ->
         new_account_set = MapSet.put(account_set, transaction.cuenta_origen)
@@ -102,14 +105,14 @@ defmodule Ledger.Validators do
              MapSet.member?(account_set, transaction.cuenta_destino) do
           validate_account_creation(rest, account_set)
         else
-          {:error, "account not created before transfer"}
+          {:error, {:account_not_created_before_transfer, line_number}}
         end
 
       "swap" ->
         if MapSet.member?(account_set, transaction.cuenta_origen) do
           validate_account_creation(rest, account_set)
         else
-          {:error, "account not created before swap"}
+          {:error, {:account_not_created_before_swap, line_number}}
         end
 
       _ ->
@@ -123,14 +126,14 @@ defmodule Ledger.Validators do
              Decimal.compare(amount, 0) == :lt
            end) do
         nil -> {:cont, :ok}
-        {currency, _} -> {:halt, {:error, {account, currency}}}
+        {currency, _} -> {:halt, {:error, {:negative_balance, account, currency}}}
       end
     end)
   end
 
   def validate_balances(transactions, map_coins) do
     balances =
-      Enum.reduce(transactions, %{}, fn tx, acc ->
+      Enum.reduce(transactions, %{}, fn {tx, _line_number}, acc ->
         account = tx.cuenta_origen || tx.cuenta_destino
         current_balance = Map.get(acc, account, %{})
 
@@ -144,8 +147,8 @@ defmodule Ledger.Validators do
       :ok ->
         {:ok, balances}
 
-      {:error, {account, _}} ->
-        {:error, "Se detectó un balance negativo en la cuenta de #{account}"}
+      error ->
+        error
     end
   end
 end

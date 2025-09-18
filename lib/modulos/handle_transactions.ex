@@ -14,7 +14,8 @@ defmodule Ledger.HandleTransactions do
            Ledger.TransactionReader.read_and_validate_transactions(filename, coins) do
       {:ok, %{coins: coins, transactions: transactions}}
     else
-      {:error, reason} -> {:error, reason}
+      error ->
+        error
     end
   end
 
@@ -29,12 +30,7 @@ defmodule Ledger.HandleTransactions do
     Ledger.OutputWriter.output_results_transaction(filtered, config)
   end
 
-  def output_transactions_result({:error, reason}, _config) when is_binary(reason) do
-    IO.puts("Error: #{reason}")
-  end
-
-  def output_transactions_result({:error, line_number}, _config) when is_integer(line_number) do
-    IO.puts("Error en la línea #{line_number} del archivo de transacciones.")
-    IO.inspect({:error, line_number})
+  def output_transactions_result({:error, _reason} = error, _config) do
+    Ledger.HandleError.handle(error)
   end
 end

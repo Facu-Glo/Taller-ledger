@@ -1,7 +1,7 @@
 defmodule Ledger.OutputWriter do
   def write_to_file_transaction(data, filename) do
     content =
-      Enum.map(data, fn transaction ->
+      Enum.map(data, fn {transaction, _line_number} ->
         [
           transaction.id,
           transaction.timestamp,
@@ -25,7 +25,7 @@ defmodule Ledger.OutputWriter do
   end
 
   def console_output_transaction(data) do
-    Enum.map(data, fn transaction ->
+    Enum.map(data, fn {transaction, _line_number} ->
       IO.puts(
         "#{transaction.id};#{transaction.timestamp};#{transaction.moneda_origen};#{transaction.moneda_destino};#{transaction.monto};#{transaction.cuenta_origen};#{transaction.cuenta_destino};#{transaction.tipo}"
       )

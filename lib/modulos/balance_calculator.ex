@@ -86,7 +86,7 @@ defmodule Ledger.BalanceCalculator do
       total = calculate_total(balances, coins, target_value, zero)
       {:ok, %{target_currency => total}}
     else
-      :error -> {:error, "Moneda inválida"}
+      :error -> {:error, :invalid_currency}
     end
   end
 
