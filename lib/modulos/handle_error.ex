@@ -1,29 +1,36 @@
 defmodule Ledger.HandleError do
   def handle({:error, {:invalid_integer, line}}) do
+    IO.puts("{:error, #{line}}")
     IO.puts("Error: ID de transacción inválido en la línea #{line}.")
   end
 
   def handle({:error, {:invalid_decimal, line}}) do
+    IO.puts("{:error, #{line}}")
     IO.puts("Error: monto inválido en la línea #{line}.")
   end
 
   def handle({:error, {:negative_decimal, line}}) do
+    IO.puts("{:error, #{line}}")
     IO.puts("Error: monto negativo en la línea #{line}.")
   end
 
   def handle({:error, {:invalid_type, line}}) do
+    IO.puts("{:error, #{line}}")
     IO.puts("Error: tipo de transacción inválido en la línea #{line}.")
   end
 
   def handle({:error, {:invalid_coin, line}}) do
+    IO.puts("{:error, #{line}}")
     IO.puts("Error: moneda inválida en la línea #{line}.")
   end
 
   def handle({:error, {:account_not_created_before_transfer, line}}) do
+    IO.puts("{:error, #{line}}")
     IO.puts("Error: se intentó transferir desde/hacia una cuenta no creada (línea #{line}).")
   end
 
   def handle({:error, {:account_not_created_before_swap, line}}) do
+    IO.puts("{:error, #{line}}")
     IO.puts("Error: se intentó hacer un swap desde una cuenta no creada (línea #{line}).")
   end
 

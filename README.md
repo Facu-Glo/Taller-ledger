@@ -13,6 +13,7 @@ ledger/
 │      ├── currency_loader.ex     # Carga de monedas desde CSV
 │      ├── handle_balance.ex      # Manejo del subcomando balance
 │      ├── handle_transactions.ex # Manejo del subcomando transacciones
+│      ├── handle_error.ex        # Manejo de errores
 │      ├── output_writer.ex       # Escritura de resultados
 │      ├── transaction_reader.ex  # Lectura y filtrado de transacciones
 │      └── validators.ex          # Validaciones de datos
@@ -24,7 +25,9 @@ ledger/
 └── README.md
 ```
 
-El sistema está compuesto por dos archivos CSV principales:
+## Archivos CSV
+
+El sistema está compuesto por dos archivos CSV principales con formato específico:
 ### monedas.csv
 
 Registro maestro de monedas disponibles y su valor de referencia en USD.
@@ -61,7 +64,7 @@ id_transaccion;timestamp;moneda_origen;moneda_destino;monto;cuenta_origen;cuenta
 2;1755541804;BTC;USDT;0.1;userB;;swap
 3;1756751404;BTC;;50000;userC;;alta_cuenta
 ```
-
+**IMPORTANTE:** El sistema únicamente acepta archivos en formato CSV con separador punto y coma (`;`). No se soportan otros formatos de archivo.
 ## Compilación y Ejecución
 
 ### Compilación
@@ -144,38 +147,140 @@ Calcula el balance de una cuenta específica.
 # Guardar balance en archivo
 ./ledger balance -c1=userA -o=balance_output.csv
 ```
+## Formato de Salida
 
+### Balance
+
+El formato de salida para balances es:
+```bash
+MONEDA=BALANCE
+```
+Donde BALANCE siempre se muestra con 6 decimales:
+```bash
+BTC=2.453445
+ARS=234435345.000000
+```
+### Transacciones
+
+Las transacciones se muestran en formato CSV con separador `;`:
+```bash
+id;timestamp;moneda_origen;moneda_destino;monto;cuenta_origen;cuenta_destino;tipo
+```
+**Salida por terminal:**
+```bash
+1;1754937004;USDT;USDT;100.50;userA;userB;transferencia
+2;1755541804;BTC;USDT;0.1;userB;;swap
+```
 ## Manejo de Errores
 
-El sistema maneja los siguientes tipos de errores:
+El sistema maneja los siguientes tipos de errores, mostrando tanto el formato de tupla requerido `{:error, <nro_linea>}` como mensajes descriptivos:
 
-### Errores de Formato
+### Errores de Validación de Datos (con número de línea)
 
-- **Líneas malformadas**: `{:error, <nro_linea>}`
-- **IDs de transacción inválidos**: Deben ser números enteros no negativos
-- **Montos inválidos**: Deben ser números decimales no negativos
-- **Tipos de transacción inválidos**: Solo se permiten `transferencia`, `swap`, `alta_cuenta`
+- **ID de transacción inválido** (`invalid_integer`): El ID debe ser un número entero no negativo
+  ```
+  {:error, nro_linea}
+  Error: ID de transacción inválido en la línea nro_linea.
+  ```
 
-### Errores de Validación de Negocio
+- **Monto inválido** (`invalid_decimal`): El monto debe ser un número decimal válido
+  ```
+  {:error, nro_linea}
+  Error: monto inválido en la línea nro_linea.
+  ```
 
-- **Monedas inexistentes**: Las monedas usadas en transacciones deben existir en `monedas.csv`
-- **Cuentas no creadas**: Las cuentas deben ser creadas con `alta_cuenta` antes de usarse
-- **Swaps inválidos**: En swaps, `moneda_origen` y `moneda_destino` deben ser diferentes
+- **Monto negativo** (`negative_decimal`): Los montos no pueden ser negativos
+  ```
+  {:error, nro_linea}
+  Error: monto negativo en la línea nro_linea.
+  ```
 
-### Errores de Archivos
+- **Tipo de transacción inválido** (`invalid_type`): Solo se permiten `transferencia`, `swap`, `alta_cuenta`
+  ```
+  {:error, nro_linea}
+  Error: tipo de transacción inválido en la línea nro_linea.
+  ```
 
-- **Archivo no encontrado**: Cuando el archivo de transacciones o monedas no existe
-- **Errores de formato CSV**: Problemas al parsear los archivos CSV
+- **Moneda inválida** (`invalid_coin`): La moneda no existe en monedas.csv
+  ```
+  {:error, nro_linea}
+  Error: moneda inválida en la línea nro_linea.
+  ```
+
+- **Cuenta no creada antes de transferencia** (`account_not_created_before_transfer`): Las cuentas deben ser creadas con `alta_cuenta` antes de usarse en transferencias
+  ```
+  {:error, nro_linea}
+  Error: se intentó transferir desde/hacia una cuenta no creada (línea nro_linea).
+  ```
+
+- **Cuenta no creada antes de swap** (`account_not_created_before_swap`): Las cuentas deben ser creadas antes de realizar swaps
+  ```
+  {:error, nro_linea}
+  Error: se intentó hacer un swap desde una cuenta no creada (línea nro_linea).
+  ```
+
+### Errores de Sistema (sin número de línea)
+
+- **Balance negativo**: Una cuenta no puede tener balance negativo
+  ```
+  Error: la cuenta userA tiene balance negativo en BTC.
+  ```
+
+- **Archivo no encontrado**: El archivo especificado no existe
+  ```
+  Error: Archivo no encontrado: transacciones.csv
+  ```
+
+- **Valor de moneda inválido**: Error al parsear el valor de una moneda en monedas.csv
+  ```
+  Error: Valor de moneda inválido para BTC.
+  ```
+
+- **Moneda inválida**: Moneda especificada en flag -m no existe
+  ```
+  Error: Moneda inválida.
+  ```
 
 ### Errores de Comandos
 
-- **Subcomando faltante**: Se debe especificar `transacciones` o `balance`
-- **Flags inválidos**: Flags no reconocidos o con formato incorrecto
 - **Cuenta origen faltante**: Para el subcomando `balance` es obligatorio especificar `-c1`
+  ```
+  Error: Debe especificar una cuenta de origen con -c1.
+  ```
+
+- **Subcomando inválido**: Se debe especificar `transacciones` o `balance`
+  ```
+  Error: Debe especificar un subcomando: transacciones o balance
+  ```
+
+- **Flag desconocida**: Flag no reconocido
+  ```
+  Error: Flag desconocida: -x=valor
+  ```
 
 ## Tests
-#### Ejecutar Tests
 
+### Ejecutar Tests
+```bash
+mix test
+```
+
+### Coverage de Tests
 ```bash
 mix coveralls
 ```
+
+El proyecto mantiene un coverage de al menos 90% como requerido.
+
+### Coverage en HTML
+```bash
+mix coveralls.html
+```
+Los reportes se generan en `cover/excoveralls.html`
+
+## Consideraciones Técnicas
+
+- **Formato de archivos**: Solo se acepta formato CSV con separador punto y coma (`;`)
+- **Inmutabilidad**: Las transacciones son inmutables una vez registradas
+- **Precisión decimal**: Se utiliza la librería `Decimal` para cálculos precisos con monedas
+- **Ordenamiento**: Las transacciones se procesan en orden cronológico para validar la creación de cuentas
